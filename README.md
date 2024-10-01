@@ -37,6 +37,15 @@ To run the main program:
 
 To run the tests:
 ```bash
-./run_tests
+./tests
+```
+
+## Release
+Can dramatic improve the performance simply by enabling compiler optimization:
+```bash
+mkdir build-release
+cd build-release
+cmake ../ -DCMAKE_BUILD_TYPE=Release
+make
 ```
 
