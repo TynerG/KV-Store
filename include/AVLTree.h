@@ -31,7 +31,6 @@ class AVLTree {
     bool insert(int key, int value);
     // Returns the value of the key
     int getValue(int key);
-
     // Scan the tree between key 1 and key 2, return a list of key value pairs
     vector<array<int, 2>> scan(Node* node, int low, int high);
     vector<array<int, 2>> scan(int low, int high);
