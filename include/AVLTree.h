@@ -4,6 +4,11 @@
 #include <iostream>
 #include <string>
 
+#include <vector>
+#include <array>
+
+using namespace std;
+
 class Node {
    public:
     int key;
@@ -21,28 +26,32 @@ class AVLTree {
     int capacity;
     int size;
 
-    AVLTree(int capacity);
+    explicit AVLTree(int capacity);
     // Inserts and returns whether the tree is full
     bool insert(int key, int value);
     // Returns the value of the key
     int getValue(int key);
-    
+    // Scan the tree between key 1 and key 2, return a list of key value pairs
+    vector<array<int, 2>> scan(Node* node, int low, int high);
+    vector<array<int, 2>> scan(int low, int high);
+    vector<array<int, 2>> scan(Node* node);
+    vector<array<int, 2>> scan();
+
     // Returns a string representation of the tree
-    std::string inOrder();
-    std::string preOrder();
+    string inOrderString();
+    string preOrderString();
 
     // Destructor
     ~AVLTree();
 
    private:
-    int getHeight(Node* node);
-    int getBalance(Node* node);
+    static int getHeight(Node* node);
+    static int getBalance(Node* node);
     Node* insertNode(Node* node, int key, int val);
     int getValueNode(Node* node, int key);
-    Node* rightRotate(Node* node);
-    Node* leftRotate(Node* node);
-    std::string inOrderNode(Node* node);
-    std::string preOrderNode(Node* node);
+    static Node* rightRotate(Node* node);
+    static Node* leftRotate(Node* node);
+    string preOrderNodeString(Node* node);
     void deleteTree(Node* node);
 };
 

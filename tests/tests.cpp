@@ -18,6 +18,15 @@ void checkTestResult(const T& expected, const T& result, int& passed,
     }
 }
 
+string stringify_kv_pairs(const vector <array<int, 2>>& the_pair) {
+    string result;
+    for (auto pair: the_pair){
+        result += to_string(pair[0]) + " ";
+    }
+
+    return result;
+}
+
 void runAVLTreeTests() {
     cout << "Running AVL tree tests..." << endl;
 
@@ -29,7 +38,7 @@ void runAVLTreeTests() {
 
     cout << "Test: Single insertion" << endl;
     tree.insert(10, 10);
-    result = tree.preOrder();
+    result = tree.preOrderString();
     checkTestResult<string>("10 ", result, passed, failed);
 
     cout << "Test: Multiple insertions" << endl;
@@ -38,9 +47,9 @@ void runAVLTreeTests() {
     tree.insert(40, 40);
     tree.insert(50, 50);
     tree.insert(25, 123);
-    result = tree.preOrder();
+    result = tree.preOrderString();
     checkTestResult<string>("30 20 10 25 40 50 ", result, passed, failed);
-    result = tree.inOrder();
+    result = tree.inOrderString();
     checkTestResult<string>("10 20 25 30 40 50 ", result, passed, failed);
 
     cout << "Test: Get" << endl;
@@ -52,6 +61,14 @@ void runAVLTreeTests() {
     checkTestResult<bool>(false, boolResult, passed, failed);
     boolResult = tree.insert(70, 60);
     checkTestResult<bool>(true, boolResult, passed, failed);
+
+    cout << "Test: Scan" << endl;
+    string expected = "25 30 40 50 60 ";
+    checkTestResult(expected, stringify_kv_pairs(tree.scan(23, 69)), passed, failed);
+
+    cout << "Test: Scan Inclusive" << endl;
+    expected = "20 25 30 40 50 60 70 ";
+    checkTestResult(expected, stringify_kv_pairs(tree.scan(20, 70)), passed, failed);
 
     // Summary of tests completed
     cout << "Tests completed: " << passed << "/" << (passed + failed)
