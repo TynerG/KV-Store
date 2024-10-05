@@ -12,10 +12,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 include_directories(include)
 
 # Add the main executable
-add_executable(main main.cpp src/AVLTree.cpp)
+add_executable(main main.cpp src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        src/SSTController.cpp
+        include/SSTController.h)
 
 # Add the test executable
-add_executable(tests tests/tests.cpp src/AVLTree.cpp)
+add_executable(tests tests/tests.cpp src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        src/SSTController.cpp
+        include/SSTController.h)
 
 # Optionally link with testing frameworks (e.g., Google Test) if required
 # target_link_libraries(run_tests gtest gtest_main)
