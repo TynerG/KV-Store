@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sys/stat.h>
+#include <cassert>
 
 #include "../include/AVLTree.h"
 #include "../include/SSTController.h"
@@ -124,7 +125,6 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     checkTestResult<int>(0, result, passed, failed);
 
     cout << "Test: Saving a KV-Pair as SST" << endl;
-    string expectedPathToSST = "./MyDatabase/sst-1";
     controller.save(kvPairs);
     const vector<array<int, 2>> &savedKvPairs = controller.read(1);
     string expectedKvPairs = "(10,10) (20,20) (23,123) (24,124) (25,125) (30,30) (40,40) (50,50) ";
@@ -140,6 +140,39 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     SSTController controllerForExistingDb(dbName);
     actualMetadata = controllerForExistingDb.getMetadata();
     checkTestResult<int>(expectedMetadata, actualMetadata, passed, failed);
+
+    cout << "Test: Multiple SSTs" << endl;
+    // build another SST
+    AVLTree tree2(8);  // Assuming 8 is the initial capacity or some parameter
+    tree2.insert(10, 15);
+    tree2.insert(20, 25);
+    tree2.insert(30, 35);
+    tree2.insert(40, 45);
+    tree2.insert(50, 55);
+    tree2.insert(60, 65);
+    tree2.insert(70, 75);
+    tree2.insert(80, 85);
+    const vector<array<int, 2>> &kvPairs2 = tree2.scan();
+    controller.save(kvPairs2);
+
+    const vector<array<int, 2>> &savedKvPairs2 = controller.read(2);
+    expectedKvPairs = "(10,15) (20,25) (30,35) (40,45) (50,55) (60,65) (70,75) (80,85) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs2), passed, failed);
+
+    cout << "Test: SST Get - Get The Newest Value" << endl;
+    const pair<bool, int> &pair = controller.get(10);
+    assert(true == pair.first);
+    checkTestResult<int>(15, pair.second, passed, failed);
+
+    cout << "Test: SST Get - Non-existing Key" << endl;
+    const ::pair<bool, int> &pair2 = controller.get(100);
+    assert(false == pair2.first);
+    checkTestResult<int>(-1, pair2.second, passed, failed);
+
+    cout << "Test: SST Scan" << endl;
+    const vector<array<int, 2>> &scanResult = controller.scan(19, 67);
+    expectedKvPairs = "(20,25) (23,123) (24,124) (25,125) (30,35) (40,45) (50,55) (60,65) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(scanResult), passed, failed);
 
     // Clean up test data
     if (isCleanUpTestData) {

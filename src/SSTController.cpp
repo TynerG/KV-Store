@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <utility>
+#include <unordered_set>
+#include <algorithm>
 
 #include "SSTController.h"
 
@@ -105,6 +107,67 @@ vector<array<int, 2>> SSTController::read(int theSSTIdx) {
     return kvPairs;
 }
 
+pair<bool, int> SSTController::get(int theKey) {
+    for (int i = myNumSST; i > 0; i--) {
+        const vector<array<int, 2>> &sst = read(i);
+        int result = searchSST(sst, theKey);
+
+        if (result != -1) {
+            pair<bool, int> returnPair(true, sst[result][1]);
+            return returnPair;
+        }
+    }
+
+    // Target not found if we reach here
+    pair<bool, int> returnPair(false, -1);
+    return returnPair;
+}
+
+vector<array<int, 2>> SSTController::scan(int theLow, int theHigh) {
+    // a hash set for checking whether a key has already been added to result
+    unordered_set<int> lookupSet;
+    vector<array<int, 2>> result;
+
+    for (int i = myNumSST; i > 0; i--) {
+        const vector<array<int, 2>> &sst = read(i);
+        unsigned long size = sst.size();
+
+        // Skip the current SST if nothing is in range
+        if (sst[0][1] > theHigh || sst[size - 1][1] < theLow) {
+            continue;
+        }
+
+        // Do a binary search to find the smallest element in range.
+        // Note that it will not return -1 since we are already in range
+        int targetIdx = searchSSTSmallestLarger(sst, theLow);
+
+        for (int j = targetIdx; j < size; j++) {
+            // skip the current SST if value exceeds theHigh
+            if (sst[j][0] > theHigh) {
+                break;
+            }
+
+            // skip the current element if it is already added in previous iterations
+            if (lookupSet.find(sst[j][0]) != lookupSet.end()) {
+                continue;
+            }
+
+            // add the pair into result
+            result.push_back(sst[j]);
+            // add key to lookupSet to prevent duplicates
+            lookupSet.insert(sst[j][0]);
+        }
+    }
+
+    // sort the result based on key
+    // TODO: any ways to avoid the sort?
+    sort(result.begin(), result.end(), [](const array<int, 2> &a, const array<int, 2> b) {
+        return a[0] < b[0];
+    });
+
+    return result;
+}
+
 int SSTController::getMetadata() {
     return myNumSST;
 }
@@ -121,4 +184,53 @@ string SSTController::existingSSTPath(int theSSTIdx) {
     return buildPath(SST_FILENAME + to_string(theSSTIdx));
 }
 
+int SSTController::searchSST(const vector<array<int, 2>> &theKVPairs, int theTarget) {
+    int lowIdx = 0;
+    int highIdx = theKVPairs.size() - 1;
 
+    while (lowIdx <= highIdx) {
+        int midIdx = lowIdx + (highIdx - lowIdx) / 2;
+
+        // Check if the target is found
+        if (theKVPairs[midIdx][0] == theTarget) {
+            return midIdx;
+        }
+
+        // Update the middle index according to the value of the current element
+        if (theKVPairs[midIdx][0] < theTarget) {
+            lowIdx = midIdx + 1;
+        } else {
+            highIdx = midIdx - 1;
+        }
+    }
+
+    // Target not found
+    return -1;
+}
+
+int SSTController::searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs, int theTarget) {
+    int lowIdx = 0;
+    int highIdx = theKVPairs.size() - 1;
+    int resultIdx = -1;
+
+    while (lowIdx <= highIdx) {
+        int midIdx = lowIdx + (highIdx - lowIdx) / 2;
+
+        // Check if the target is found
+        if (theKVPairs[midIdx][0] == theTarget) {
+            return midIdx;
+        }
+
+        // Update the middle index according to the value of the current element, along with the potential result
+        if (theKVPairs[midIdx][0] < theTarget) {
+            lowIdx = midIdx + 1;
+        } else {
+            highIdx = midIdx - 1;
+            // record potential result
+            resultIdx = midIdx;
+        }
+    }
+
+    // Target not found
+    return resultIdx;
+}

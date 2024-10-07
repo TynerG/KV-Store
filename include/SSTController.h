@@ -12,6 +12,9 @@
 
 using namespace std;
 
+/**
+ * Represents and controls the SST part of the KV store.
+ */
 class SSTController {
 private:
 
@@ -53,14 +56,31 @@ private:
      */
     string existingSSTPath(int theSSTIdx);
 
+    /**
+     * perform a binary search on the given KV-Pairs
+     * @param theTarget
+     * @return the index of the target, or -1 if target not found
+     */
+    int searchSST(const vector<array<int, 2>> &theKVPairs, int theTarget);
+
+    /**
+     * perform a binary search on the given KV-Pairs and return the smallest element that is larger than or equal to
+     * the target
+     * @param theTarget
+     * @return the index of the smallest element that is larger than or equal to the target, or -1 if target not found
+     */
+    int searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs, int theTarget);
+
 public:
 
     explicit SSTController(string theDbName);
 
     /**
-     * Get the most up-to-date value of the given key.
+     * Get the most up-to-date value of the given key from all SSTs.
+     * @return a pair where the first element representing whether the target is found, and the second element
+     * representing the value found (or -1 if the first element is false)
      */
-    int get(int theKey);
+    pair<bool, int> get(int theKey);
 
     /**
      * Retrieves all KV-pairs in a key range in key order (high < low)
@@ -78,6 +98,9 @@ public:
      * read the given SST file from the database and convert into KV-pairs
      * @param theKVPairs the index of the SST
      * @return the KV-pairs
+     *
+     * TODO: currently this reads an entire SST at once. Might need to change to read only a page of the file so it
+     *  can fit into memory. Let's ask the professor if it is needed.
      */
     vector<array<int, 2>> read(int theSSTIdx);
 
