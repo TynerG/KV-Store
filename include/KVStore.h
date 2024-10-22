@@ -23,7 +23,7 @@ private:
     vector<array<int, 2>> mergeScanResults(const vector<array<int, 2>> &scanMem, const vector<array<int, 2>> &scanSST);
 
 public:
-    KVStore(int memtableSize, string dBName);
+    KVStore(int memtableSize, string dBName, int bufferCapacity);
 
     /**
      * Stores a key associated with a value

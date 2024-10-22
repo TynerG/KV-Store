@@ -16,14 +16,18 @@ add_executable(main main.cpp src/AVLTree.cpp
         include/KVStore.h
         src/KVStore.cpp
         src/SSTController.cpp
-        include/SSTController.h)
+        include/SSTController.h
+        src/BufferPool.cpp
+        include/BufferPool.h)
 
 # Add the test executable
 add_executable(tests tests/tests.cpp src/AVLTree.cpp
         include/KVStore.h
         src/KVStore.cpp
         src/SSTController.cpp
-        include/SSTController.h)
+        include/SSTController.h
+        src/BufferPool.cpp
+        include/BufferPool.h)
 
 # Optionally link with testing frameworks (e.g., Google Test) if required
 # target_link_libraries(run_tests gtest gtest_main)

@@ -10,6 +10,8 @@
 #include <array>
 #include <vector>
 
+#include "BufferPool.h"
+
 using namespace std;
 
 /**
@@ -17,6 +19,10 @@ using namespace std;
  */
 class SSTController {
 private:
+    /**
+     * BufferPool for SST pages
+     */
+    BufferPool bufferPool;
 
     /**
      * The number of SSTs in the database
@@ -73,7 +79,7 @@ private:
 
 public:
 
-    explicit SSTController(string theDbName);
+    explicit SSTController(string theDbName, int bufferPoolCapacity);
 
     /**
      * Get the most up-to-date value of the given key from all SSTs.

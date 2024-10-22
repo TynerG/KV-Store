@@ -5,10 +5,10 @@
 #include <cstring>
 #include "KVStore.h"
 
-KVStore::KVStore(int memtableSize, string dBName) {
+KVStore::KVStore(int memtableSize, string dBName, int bufferCapacity) {
     myMemtableSize = memtableSize;
     myMemtable = make_shared<AVLTree>(memtableSize);
-    mySSTController = make_shared<SSTController>(dBName);
+    mySSTController = make_shared<SSTController>(dBName, bufferCapacity);
 }
 
 bool KVStore::put(int key, int value) {

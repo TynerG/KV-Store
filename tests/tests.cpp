@@ -1,16 +1,18 @@
-#include <iostream>
 #include <sys/stat.h>
+
 #include <cassert>
+#include <iostream>
 
 #include "../include/AVLTree.h"
 #include "../include/SSTController.h"
+#include "../include/xxHash32.h"
 
 int readIntFromPath(const string &expectedMetaDataPath);
 
 using namespace std;
 
 // Function template to compare results of generic types
-template<typename T>
+template <typename T>
 void checkTestResult(const T &expected, const T &result, int &passed,
                      int &failed) {
     if (result == expected) {
@@ -25,7 +27,7 @@ void checkTestResult(const T &expected, const T &result, int &passed,
 
 string stringifyKvPairs(const vector<array<int, 2>> &the_pair) {
     string result;
-    for (auto pair: the_pair) {
+    for (auto pair : the_pair) {
         result += "(" + to_string(pair[0]) + "," + to_string(pair[1]) + ") ";
     }
 
@@ -72,11 +74,13 @@ array<int, 2> runAVLTreeTests() {
 
     cout << "Test: Scan" << endl;
     string expected = "(25,123) (30,30) (40,40) (50,50) (60,60) ";
-    checkTestResult(expected, stringifyKvPairs(tree.scan(23, 69)), passed, failed);
+    checkTestResult(expected, stringifyKvPairs(tree.scan(23, 69)), passed,
+                    failed);
 
     cout << "Test: Scan Inclusive" << endl;
     expected = "(20,20) (25,123) (30,30) (40,40) (50,50) (60,60) (70,60) ";
-    checkTestResult(expected, stringifyKvPairs(tree.scan(20, 70)), passed, failed);
+    checkTestResult(expected, stringifyKvPairs(tree.scan(20, 70)), passed,
+                    failed);
 
     // Summary of tests completed
     cout << "Tests completed: " << passed << "/" << (passed + failed)
@@ -95,22 +99,23 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     // Setup
     int passed = 0;
     int failed = 0;
+    int bufferPoolCapacity = 1;
 
     // build KV-Pairs
     AVLTree tree(8);  // Assuming 8 is the initial capacity or some parameter
     tree.insert(10, 10);
     tree.insert(20, 20);
+    tree.insert(50, 50);
     tree.insert(23, 123);
-    tree.insert(24, 124);
     tree.insert(25, 125);
+    tree.insert(24, 124);
     tree.insert(30, 30);
     tree.insert(40, 40);
-    tree.insert(50, 50);
     const vector<array<int, 2>> &kvPairs = tree.scan();
 
     // init the controller
     const string dbName = "MyDatabase";
-    SSTController controller(dbName);
+    SSTController controller(dbName, bufferPoolCapacity);
 
     cout << "Test: Database Creation - Directory Created" << endl;
     string expectedDbPath = "./MyDatabase";
@@ -127,8 +132,10 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     cout << "Test: Saving a KV-Pair as SST" << endl;
     controller.save(kvPairs);
     const vector<array<int, 2>> &savedKvPairs = controller.read(1);
-    string expectedKvPairs = "(10,10) (20,20) (23,123) (24,124) (25,125) (30,30) (40,40) (50,50) ";
-    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs), passed, failed);
+    string expectedKvPairs =
+        "(10,10) (20,20) (23,123) (24,124) (25,125) (30,30) (40,40) (50,50) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs),
+                            passed, failed);
 
     cout << "Test: Maintains Metadata" << endl;
     int expectedMetadata = 1;
@@ -137,7 +144,7 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
 
     cout << "Test: Open Existing Database" << endl;
     expectedMetadata = 1;
-    SSTController controllerForExistingDb(dbName);
+    SSTController controllerForExistingDb(dbName, bufferPoolCapacity);
     actualMetadata = controllerForExistingDb.getMetadata();
     checkTestResult<int>(expectedMetadata, actualMetadata, passed, failed);
 
@@ -156,8 +163,10 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     controller.save(kvPairs2);
 
     const vector<array<int, 2>> &savedKvPairs2 = controller.read(2);
-    expectedKvPairs = "(10,15) (20,25) (30,35) (40,45) (50,55) (60,65) (70,75) (80,85) ";
-    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs2), passed, failed);
+    expectedKvPairs =
+        "(10,15) (20,25) (30,35) (40,45) (50,55) (60,65) (70,75) (80,85) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs2),
+                            passed, failed);
 
     cout << "Test: SST Get - Get The Newest Value" << endl;
     const pair<bool, int> &pair = controller.get(10);
@@ -171,12 +180,15 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
 
     cout << "Test: SST Scan" << endl;
     const vector<array<int, 2>> &scanResult = controller.scan(19, 67);
-    expectedKvPairs = "(20,25) (23,123) (24,124) (25,125) (30,35) (40,45) (50,55) (60,65) ";
-    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(scanResult), passed, failed);
+    expectedKvPairs =
+        "(20,25) (23,123) (24,124) (25,125) (30,35) (40,45) (50,55) (60,65) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(scanResult),
+                            passed, failed);
 
     // Clean up test data
     if (isCleanUpTestData) {
-        // TODO: implement this after confirming we can use C++ 17 (it makes this much easier)
+        // TODO: implement this after confirming we can use C++ 17 (it makes
+        // this much easier)
         //  for now, manually remove everything under and including ./MyDatabase
     }
 
@@ -195,16 +207,38 @@ int readIntFromPath(const string &expectedMetaDataPath) {
     return result;
 }
 
+array<int, 2> runBufferPoolTests() {
+    cout << "\n" << endl;
+    cout << "#################################" << endl;
+    cout << "# Running Buffer Pool tests..." << endl;
+    cout << "#################################" << endl;
+
+    // Setup
+    int passed = 0;
+    int failed = 0;
+
+    cout << "Test: Hash function consistency" << endl;
+    std::string input = "Hello, World!";
+    std::string input2 = "Hello, World!";
+    int seed = 123;
+    int expected = XXHash32::hash(input.c_str(), input.size(), seed);
+    int actual = XXHash32::hash(input2.c_str(), input2.size(), seed);
+    checkTestResult<int>(expected, actual, passed, failed);
+
+    return {passed, failed};
+}
+
 int main() {
     vector<array<int, 2>> passFails;
 
     passFails.push_back(runAVLTreeTests());
     passFails.push_back(runSSTControllerTests(false));
+    passFails.push_back(runBufferPoolTests());
 
     // calculate the total number of passed/failed tests
     int passed = 0;
     int failed = 0;
-    for (auto passFail: passFails) {
+    for (auto passFail : passFails) {
         passed += passFail[0];
         failed += passFail[1];
     }

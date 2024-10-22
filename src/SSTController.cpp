@@ -2,20 +2,23 @@
 // Created by laptop on 2024/10/4.
 //
 
-#include <sys/stat.h>
-#include <cstring>
-#include <utility>
-#include <unordered_set>
-#include <algorithm>
-
 #include "SSTController.h"
+
+#include <sys/stat.h>
+
+#include <algorithm>
+#include <cstring>
+#include <unordered_set>
+#include <utility>
+
+#include "BufferPool.h"
+#include "Constants.h"
 
 string METADATA_FILENAME = "metadata";
 string SST_FILENAME = "sst-";
 
-SSTController::SSTController(string theDbName) {
-    myDbName = std::move(theDbName);
-
+SSTController::SSTController(string theDbName, int bufferPoolCapacity)
+    : bufferPool(bufferPoolCapacity), myDbName(std::move(theDbName)) {
     // Step 1: create the directory and metadata if not exist
     if (mkdir(myDbName.c_str(), 0777) == 0) {
         myNumSST = 0;
@@ -67,7 +70,8 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
         return false;
     }
 
-    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()), theKVPairs.size() * sizeof(array<int, 2>));
+    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()),
+                     theKVPairs.size() * sizeof(array<int, 2>));
 
     if (outputFile.fail()) {
         return false;
@@ -82,25 +86,65 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
     return true;
 }
 
+// vector<array<int, 2>> SSTController::read(int theSSTIdx) {
+//     ifstream inputFile(existingSSTPath(theSSTIdx));
+//     if (!inputFile) {
+//         throw runtime_error("error when reading SSTs");
+//     }
+
+//     // Get the size of the file
+//     inputFile.seekg(0, ios::end);
+//     streamsize sizeSST = inputFile.tellg();
+//     inputFile.seekg(0, ios::beg);
+
+//     // Calculate how many KV pairs we need to read. Note that the SSTs might
+//     differ in size because we need to save
+//     // the memtable when closing the DB no matter if it is full.
+//     size_t numKVPairs = sizeSST / sizeof(array<int, 2>);
+//     vector<array<int, 2>> kvPairs(numKVPairs);
+
+//     // Read the data
+//     if (!inputFile.read(reinterpret_cast<char *>(kvPairs.data()), sizeSST)) {
+//         throw runtime_error("error when reading SSTs");
+//     }
+
+//     inputFile.close();
+//     return kvPairs;
+// }
+
 vector<array<int, 2>> SSTController::read(int theSSTIdx) {
-    ifstream inputFile(existingSSTPath(theSSTIdx));
+    ifstream inputFile(existingSSTPath(theSSTIdx), ios::binary);
     if (!inputFile) {
-        throw runtime_error("error when reading SSTs");
+        throw runtime_error("Error when reading SSTs");
     }
 
-    // Get the size of the file
-    inputFile.seekg(0, ios::end);
-    streamsize sizeSST = inputFile.tellg();
-    inputFile.seekg(0, ios::beg);
+    vector<array<int, 2>> kvPairs;
 
-    // Calculate how many KV pairs we need to read. Note that the SSTs might differ in size because we need to save
-    // the memtable when closing the DB no matter if it is full.
-    size_t numKVPairs = sizeSST / sizeof(array<int, 2>);
-    vector<array<int, 2>> kvPairs(numKVPairs);
+    char buffer[PAGE_SIZE];
+    int pageNum = 0;
+    while (inputFile) {
+        // read the file page by page
+        inputFile.read(buffer, sizeof(buffer));
+        streamsize bytesRead = inputFile.gcount();
+        if (bytesRead <= 0) break;  // no more data to read
 
-    // Read the data
-    if (!inputFile.read(reinterpret_cast<char *>(kvPairs.data()), sizeSST)) {
-        throw runtime_error("error when reading SSTs");
+        // check buffer pool for page first
+        vector<array<int, 2>> pageKVPairs =
+            bufferPool.getPage(theSSTIdx, pageNum);
+        if (pageKVPairs.empty()) {
+            // not in buffer pool, so do an I/O and add the page to buffer pool
+            int numKVPairs = bytesRead / KVPAIR_SIZE;
+            vector<array<int, 2>> ioKVPairs(numKVPairs);
+
+            memcpy(ioKVPairs.data(), buffer, bytesRead);
+            pageKVPairs = ioKVPairs;
+            bufferPool.putPage(theSSTIdx, pageNum, ioKVPairs);
+        }
+
+        // add to all
+        kvPairs.insert(kvPairs.end(), pageKVPairs.begin(), pageKVPairs.end());
+
+        pageNum++;
     }
 
     inputFile.close();
@@ -147,7 +191,8 @@ vector<array<int, 2>> SSTController::scan(int theLow, int theHigh) {
                 break;
             }
 
-            // skip the current element if it is already added in previous iterations
+            // skip the current element if it is already added in previous
+            // iterations
             if (lookupSet.find(sst[j][0]) != lookupSet.end()) {
                 continue;
             }
@@ -161,16 +206,15 @@ vector<array<int, 2>> SSTController::scan(int theLow, int theHigh) {
 
     // sort the result based on key
     // TODO: any ways to avoid the sort?
-    sort(result.begin(), result.end(), [](const array<int, 2> &a, const array<int, 2> b) {
-        return a[0] < b[0];
-    });
+    sort(result.begin(), result.end(),
+         [](const array<int, 2> &a, const array<int, 2> b) {
+             return a[0] < b[0];
+         });
 
     return result;
 }
 
-int SSTController::getMetadata() {
-    return myNumSST;
-}
+int SSTController::getMetadata() { return myNumSST; }
 
 string SSTController::buildPath(string theFileName) {
     return myDbName + "/" + theFileName;
@@ -184,7 +228,8 @@ string SSTController::existingSSTPath(int theSSTIdx) {
     return buildPath(SST_FILENAME + to_string(theSSTIdx));
 }
 
-int SSTController::searchSST(const vector<array<int, 2>> &theKVPairs, int theTarget) {
+int SSTController::searchSST(const vector<array<int, 2>> &theKVPairs,
+                             int theTarget) {
     int lowIdx = 0;
     int highIdx = theKVPairs.size() - 1;
 
@@ -208,7 +253,8 @@ int SSTController::searchSST(const vector<array<int, 2>> &theKVPairs, int theTar
     return -1;
 }
 
-int SSTController::searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs, int theTarget) {
+int SSTController::searchSSTSmallestLarger(
+    const vector<array<int, 2>> &theKVPairs, int theTarget) {
     int lowIdx = 0;
     int highIdx = theKVPairs.size() - 1;
     int resultIdx = -1;
@@ -221,7 +267,8 @@ int SSTController::searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPai
             return midIdx;
         }
 
-        // Update the middle index according to the value of the current element, along with the potential result
+        // Update the middle index according to the value of the current
+        // element, along with the potential result
         if (theKVPairs[midIdx][0] < theTarget) {
             lowIdx = midIdx + 1;
         } else {
