@@ -2,13 +2,19 @@
 // Created by laptop on 2024/10/4.
 //
 
-#include <cstring>
 #include "KVStore.h"
+
+#include <cstring>
 
 KVStore::KVStore(int memtableSize, string dBName, int bufferCapacity) {
     myMemtableSize = memtableSize;
     myMemtable = make_shared<AVLTree>(memtableSize);
     mySSTController = make_shared<SSTController>(dBName, bufferCapacity);
+}
+
+void KVStore::deleteDb() {
+    mySSTController->deleteFiles();
+    myMemtable.reset();
 }
 
 bool KVStore::put(int key, int value) {
@@ -58,8 +64,9 @@ vector<array<int, 2>> KVStore::scan(int low, int high) {
     return results;
 }
 
-vector<array<int, 2>>
-KVStore::mergeScanResults(const vector<array<int, 2>> &scanMem, const vector<array<int, 2>> &scanSST) {
+vector<array<int, 2>> KVStore::mergeScanResults(
+    const vector<array<int, 2>> &scanMem,
+    const vector<array<int, 2>> &scanSST) {
     vector<array<int, 2>> result;
     int i = 0;
     int j = 0;

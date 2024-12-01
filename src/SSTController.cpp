@@ -4,15 +4,20 @@
 
 #include "SSTController.h"
 
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <unordered_set>
 #include <utility>
 
 #include "BufferPool.h"
 #include "Constants.h"
+
+namespace fs = std::filesystem;
 
 string METADATA_FILENAME = "metadata";
 string SST_FILENAME = "sst-";
@@ -28,6 +33,18 @@ SSTController::SSTController(string theDbName, int bufferPoolCapacity)
 
     // Step 2: read the metaData
     readMetaData();
+}
+
+void SSTController::deleteFiles() {
+    try {
+        if (fs::exists(myDbName)) {
+            fs::remove_all(myDbName);
+        } else {
+            std::cout << "Directory not found: " << myDbName << std::endl;
+        }
+    } catch (const std::exception &e) {
+        throw runtime_error("error when deleting SSTs");
+    }
 }
 
 int SSTController::updateMetaData() {
@@ -64,6 +81,8 @@ int SSTController::readMetaData() {
 }
 
 bool SSTController::save(vector<array<int, 2>> theKVPairs) {
+    if (theKVPairs.empty()) return true;
+
     ofstream outputFile(newSSTPath());
 
     if (!outputFile) {
@@ -86,33 +105,7 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
     return true;
 }
 
-// vector<array<int, 2>> SSTController::read(int theSSTIdx) {
-//     ifstream inputFile(existingSSTPath(theSSTIdx));
-//     if (!inputFile) {
-//         throw runtime_error("error when reading SSTs");
-//     }
-
-//     // Get the size of the file
-//     inputFile.seekg(0, ios::end);
-//     streamsize sizeSST = inputFile.tellg();
-//     inputFile.seekg(0, ios::beg);
-
-//     // Calculate how many KV pairs we need to read. Note that the SSTs might
-//     differ in size because we need to save
-//     // the memtable when closing the DB no matter if it is full.
-//     size_t numKVPairs = sizeSST / sizeof(array<int, 2>);
-//     vector<array<int, 2>> kvPairs(numKVPairs);
-
-//     // Read the data
-//     if (!inputFile.read(reinterpret_cast<char *>(kvPairs.data()), sizeSST)) {
-//         throw runtime_error("error when reading SSTs");
-//     }
-
-//     inputFile.close();
-//     return kvPairs;
-// }
-
-vector<array<int, 2>> SSTController::read(int theSSTIdx) {
+vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
     ifstream inputFile(existingSSTPath(theSSTIdx), ios::binary);
     if (!inputFile) {
         throw runtime_error("Error when reading SSTs");
@@ -123,15 +116,15 @@ vector<array<int, 2>> SSTController::read(int theSSTIdx) {
     char buffer[PAGE_SIZE];
     int pageNum = 0;
     while (inputFile) {
-        // read the file page by page
-        inputFile.read(buffer, sizeof(buffer));
-        streamsize bytesRead = inputFile.gcount();
-        if (bytesRead <= 0) break;  // no more data to read
-
         // check buffer pool for page first
         vector<array<int, 2>> pageKVPairs =
             bufferPool.getPage(theSSTIdx, pageNum);
         if (pageKVPairs.empty()) {
+            // read the file page by page
+            inputFile.read(buffer, sizeof(buffer));
+            streamsize bytesRead = inputFile.gcount();
+            if (bytesRead <= 0) break;  // no more data to read
+
             // not in buffer pool, so do an I/O and add the page to buffer pool
             int numKVPairs = bytesRead / KVPAIR_SIZE;
             vector<array<int, 2>> ioKVPairs(numKVPairs);
@@ -143,7 +136,6 @@ vector<array<int, 2>> SSTController::read(int theSSTIdx) {
 
         // add to all
         kvPairs.insert(kvPairs.end(), pageKVPairs.begin(), pageKVPairs.end());
-
         pageNum++;
     }
 
@@ -153,7 +145,7 @@ vector<array<int, 2>> SSTController::read(int theSSTIdx) {
 
 pair<bool, int> SSTController::get(int theKey) {
     for (int i = myNumSST; i > 0; i--) {
-        const vector<array<int, 2>> &sst = read(i);
+        const vector<array<int, 2>> &sst = readSST(i);
         int result = searchSST(sst, theKey);
 
         if (result != -1) {
@@ -173,7 +165,7 @@ vector<array<int, 2>> SSTController::scan(int theLow, int theHigh) {
     vector<array<int, 2>> result;
 
     for (int i = myNumSST; i > 0; i--) {
-        const vector<array<int, 2>> &sst = read(i);
+        const vector<array<int, 2>> &sst = readSST(i);
         unsigned long size = sst.size();
 
         // Skip the current SST if nothing is in range

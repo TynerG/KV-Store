@@ -104,11 +104,14 @@ public:
      * read the given SST file from the database and convert into KV-pairs
      * @param theKVPairs the index of the SST
      * @return the KV-pairs
-     *
-     * TODO: currently this reads an entire SST at once. Might need to change to read only a page of the file so it
-     *  can fit into memory. Let's ask the professor if it is needed.
      */
-    vector<array<int, 2>> read(int theSSTIdx);
+    vector<array<int, 2>> readSST(int theSSTIdx);
+
+    /**
+     * deletes the sst files
+     * @return whether the delete was successful
+     */
+    void deleteFiles();
 
     /**
      * return the metadata

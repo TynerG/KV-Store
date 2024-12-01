@@ -5,29 +5,29 @@ cmake_minimum_required(VERSION 3.10)
 project(AVLTreeProject)
 
 # Specify the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Include directories
 include_directories(include)
 
 # Add the main executable
-add_executable(main main.cpp src/AVLTree.cpp
-        include/KVStore.h
+add_executable(main main.cpp 
+        src/AVLTree.cpp
         src/KVStore.cpp
         src/SSTController.cpp
-        include/SSTController.h
-        src/BufferPool.cpp
-        include/BufferPool.h)
+        src/BufferPool.cpp)
 
 # Add the test executable
-add_executable(tests tests/tests.cpp src/AVLTree.cpp
-        include/KVStore.h
+add_executable(tests tests/tests.cpp 
+        src/AVLTree.cpp
         src/KVStore.cpp
         src/SSTController.cpp
-        include/SSTController.h
-        src/BufferPool.cpp
-        include/BufferPool.h)
+        src/BufferPool.cpp)
 
-# Optionally link with testing frameworks (e.g., Google Test) if required
-# target_link_libraries(run_tests gtest gtest_main)
+# Add the queryThroughput executable
+add_executable(queryThroughput tests/queryThroughput.cpp
+        src/AVLTree.cpp
+        src/KVStore.cpp
+        src/SSTController.cpp
+        src/BufferPool.cpp)

@@ -48,6 +48,7 @@ int BufferPool::findPage(int sstIdx, int pageNum) {
 };
 
 vector<array<int, 2>> BufferPool::getPage(int sstIdx, int pageNum) {
+    // cout << sstIdx << "," << pageNum << endl;
     string pageId = makePageId(sstIdx, pageNum);
     int idx = hashPageIdToIndex(pageId);
 
@@ -59,6 +60,7 @@ vector<array<int, 2>> BufferPool::getPage(int sstIdx, int pageNum) {
         }
         curr = curr->next;
     }
+    // cout << "page not found" << endl;
     return {};
 }
 

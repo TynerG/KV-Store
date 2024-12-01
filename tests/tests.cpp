@@ -90,7 +90,7 @@ array<int, 2> runAVLTreeTests() {
     return passFail;
 }
 
-array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
+array<int, 2> runSSTControllerTests() {
     cout << "\n" << endl;
     cout << "#################################" << endl;
     cout << "# Running SST Controller tests..." << endl;
@@ -131,7 +131,7 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
 
     cout << "Test: Saving a KV-Pair as SST" << endl;
     controller.save(kvPairs);
-    const vector<array<int, 2>> &savedKvPairs = controller.read(1);
+    const vector<array<int, 2>> &savedKvPairs = controller.readSST(1);
     string expectedKvPairs =
         "(10,10) (20,20) (23,123) (24,124) (25,125) (30,30) (40,40) (50,50) ";
     checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs),
@@ -162,7 +162,7 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
     const vector<array<int, 2>> &kvPairs2 = tree2.scan();
     controller.save(kvPairs2);
 
-    const vector<array<int, 2>> &savedKvPairs2 = controller.read(2);
+    const vector<array<int, 2>> &savedKvPairs2 = controller.readSST(2);
     expectedKvPairs =
         "(10,15) (20,25) (30,35) (40,45) (50,55) (60,65) (70,75) (80,85) ";
     checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs2),
@@ -186,11 +186,7 @@ array<int, 2> runSSTControllerTests(bool isCleanUpTestData) {
                             passed, failed);
 
     // Clean up test data
-    if (isCleanUpTestData) {
-        // TODO: implement this after confirming we can use C++ 17 (it makes
-        // this much easier)
-        //  for now, manually remove everything under and including ./MyDatabase
-    }
+    controller.deleteFiles();
 
     // Summary of tests completed
     cout << "Tests completed: " << passed << "/" << (passed + failed)
@@ -232,7 +228,7 @@ int main() {
     vector<array<int, 2>> passFails;
 
     passFails.push_back(runAVLTreeTests());
-    passFails.push_back(runSSTControllerTests(false));
+    passFails.push_back(runSSTControllerTests());
     passFails.push_back(runBufferPoolTests());
 
     // calculate the total number of passed/failed tests
