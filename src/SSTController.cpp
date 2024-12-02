@@ -82,23 +82,76 @@ int SSTController::readMetaData() {
 
 bool SSTController::save(vector<array<int, 2>> theKVPairs) {
     if (theKVPairs.empty()) return true;
+    std::cerr << "OPEN FILE\n";
 
-    ofstream outputFile(newSSTPath());
-
-    if (!outputFile) {
+    std::string newPath = newSSTPath();
+    const char *sstPath = newPath.c_str();
+    int fd = open(sstPath, O_WRONLY | O_CREAT | O_DIRECT);
+    if (fd < 0) {
+        std::cerr << "Error opening file for direct I/O: " << strerror(errno)
+                  << std::endl;
         return false;
     }
 
-    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()),
-                     theKVPairs.size() * sizeof(array<int, 2>));
+    char *buffer;
 
-    if (outputFile.fail()) {
+    // Allocate aligned memory for Direct I/O
+    if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
+        std::cerr << "Error allocating aligned memory for direct I/O"
+                  << std::endl;
+        close(fd);
         return false;
     }
 
-    outputFile.close();
+    size_t totalPairs = theKVPairs.size();
+    size_t totalSize = totalPairs * KVPAIR_SIZE;
+    size_t numPages = (totalSize + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t numKVPairsInPage = PAGE_SIZE / KVPAIR_SIZE;
 
-    // update the metadata
+    size_t pairsWritten = 0;
+    for (size_t pageNum = 0; pageNum < numPages; ++pageNum) {
+        // Calculate how many key-value pairs can fit in the current page
+        size_t numKVPairsToWrite =
+            std::min(numKVPairsInPage, totalPairs - pairsWritten);
+
+        // Copy the data for this page into the buffer
+        memcpy(buffer, &theKVPairs[pageNum * numKVPairsInPage],
+               numKVPairsToWrite * KVPAIR_SIZE);
+
+        // if (numKVPairsToWrite < numKVPairsInPage) {
+        //     // Fill the remaining page with zeros
+        //     memset(buffer + numKVPairsToWrite * KVPAIR_SIZE, 0,
+        //            (PAGE_SIZE - numKVPairsToWrite * KVPAIR_SIZE));
+        // }
+
+        // // Print the key-value pairs in the buffer
+        // std::cerr << "Buffer content for page " << pageNum << ":\n";
+        // for (size_t i = 0; i < numKVPairsInPage; i++) {
+        //     std::cerr << "Key: " << ((array<int, 2> *)buffer)[i][0]
+        //               << " Value: " << ((array<int, 2> *)buffer)[i][1]
+        //               << std::endl;
+        // }
+
+        // Write the buffer to the SST file using pwrite (at an offset)
+        int offset = pageNum * PAGE_SIZE;
+        ssize_t bytesWritten =
+            pwrite(fd, buffer, numKVPairsToWrite * KVPAIR_SIZE, offset);
+        if (bytesWritten < 0) {
+            std::cerr << "Error writing data: " << strerror(errno)
+                      << " (errno: " << errno << ")" << std::endl;
+            free(buffer);
+            close(fd);
+            return false;
+        }
+
+        // Update the number of pairs written
+        pairsWritten += numKVPairsToWrite;
+    }
+
+    free(buffer);
+    close(fd);
+
+    // Update the metadata
     myNumSST++;
     updateMetaData();
 
@@ -106,41 +159,66 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
 }
 
 vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
-    ifstream inputFile(existingSSTPath(theSSTIdx), ios::binary);
-    if (!inputFile) {
-        throw runtime_error("Error when reading SSTs");
+    // Open file with Direct I/O to bypass OS cache
+    std::string path = existingSSTPath(theSSTIdx);
+    const char *sstPath = path.c_str();
+    int fd = open(sstPath, O_RDONLY | O_DIRECT);
+    if (fd < 0) {
+        throw runtime_error("Error opening file for direct I/O");
     }
 
-    vector<array<int, 2>> kvPairs;
+    char *buffer = nullptr;
 
-    char buffer[PAGE_SIZE];
+    // Allocate memory on page boundary
+    if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
+        std::cerr << "Error allocating aligned memory for direct I/O"
+                  << std::endl;
+        close(fd);
+        throw runtime_error("Memory allocation failed");
+    }
+
+    int numKVPairs = PAGE_SIZE / KVPAIR_SIZE;
+    vector<array<int, 2>> allKVPairs;
     int pageNum = 0;
-    while (inputFile) {
-        // check buffer pool for page first
+
+    // Read the file page by page using pread (with offset)
+    while (true) {
+        // Check buffer pool for page first
         vector<array<int, 2>> pageKVPairs =
             bufferPool.getPage(theSSTIdx, pageNum);
-        if (pageKVPairs.empty()) {
-            // read the file page by page
-            inputFile.read(buffer, sizeof(buffer));
-            streamsize bytesRead = inputFile.gcount();
-            if (bytesRead <= 0) break;  // no more data to read
 
-            // not in buffer pool, so do an I/O and add the page to buffer pool
-            int numKVPairs = bytesRead / KVPAIR_SIZE;
+        if (pageKVPairs.empty()) {
+            // Page not in buffer pool, so do an I/O and add the page to buffer
+            // pool
             vector<array<int, 2>> ioKVPairs(numKVPairs);
 
-            memcpy(ioKVPairs.data(), buffer, bytesRead);
+            ssize_t result = pread(fd, buffer, PAGE_SIZE, pageNum * PAGE_SIZE);
+            if (result == 0) {
+                break;  // End of file
+            }
+            if (result <= 0) {
+                std::cerr << "Error reading data: " << strerror(errno)
+                          << std::endl;
+                free(buffer);
+                close(fd);
+                throw runtime_error("Error reading SSTs");
+            }
+
+            allKVPairs.resize(allKVPairs.size() + numKVPairs);
+            // Copy data from buffer to vector
+            memcpy(ioKVPairs.data(), buffer, result);
             pageKVPairs = ioKVPairs;
-            bufferPool.putPage(theSSTIdx, pageNum, ioKVPairs);
         }
 
-        // add to all
-        kvPairs.insert(kvPairs.end(), pageKVPairs.begin(), pageKVPairs.end());
+        // Add to all
+        allKVPairs.insert(allKVPairs.end(), pageKVPairs.begin(),
+                          pageKVPairs.end());
         pageNum++;
     }
 
-    inputFile.close();
-    return kvPairs;
+    free(buffer);
+    close(fd);
+    return allKVPairs;
 }
 
 pair<bool, int> SSTController::get(int theKey) {
