@@ -1,18 +1,22 @@
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <vector>
 
+#include "Constants.h"
 #include "KVStore.h"
 
 using namespace std;
 using namespace std::chrono;
 
 // Function to measure throughput and run the experiment
-void run_experiment(const vector<int>& data_sizes, int queries,
+void run_experiment(int totalKVPairs, int intervals, int queries,
                     const string& filename) {
+    int intervalSize = static_cast<int>(totalKVPairs / intervals);
+
     // Open the CSV file to save results
     ofstream output_file(filename);
     if (!output_file.is_open()) {
@@ -21,38 +25,43 @@ void run_experiment(const vector<int>& data_sizes, int queries,
     }
 
     // Write the header of the CSV file
-    output_file << "Data Size,Throughput (queries/sec),Time Taken (seconds)\n";
+    output_file << "Data Size (GB),Throughput (KB/s),Time Taken (s)\n";
 
-    // Iterate over each data size
-    for (int size : data_sizes) {
-        cout << "Running data size: " << size << endl;
+    // init data
+    int memSize = (1 << 20) / 8 * 1;  // 1mb total
+    int bufferCapacity =
+        (1 << 20) / 4096 * 10;  // ~10mb total, ignoring metadata
+    shared_ptr<KVStore> kvStore =
+        make_shared<KVStore>(memSize, "testDB", bufferCapacity);
 
-        // init data
-        int memSize = 512;
-        int bufferCapacity = 100;
-        shared_ptr<KVStore> kvStore =
-            make_shared<KVStore>(memSize, "testDB", bufferCapacity);
+    int prev_size = 0;
+    for (int size = intervalSize; size <= totalKVPairs;
+         size = size + intervalSize) {
+        double dataSizeGB = (double)size * KVPAIR_SIZE / (1 << 30);
+        cout << "-------------Running data size: " << std::fixed
+             << std::setprecision(3) << dataSizeGB << "GB-------------" << endl;
 
-        for (int i = 0; i < size; i++) {
+        for (int i = prev_size; i < size; i++) {
             kvStore->put(i, i);
         }
+        prev_size = size;
 
         cout << "Querying pages" << endl;
         auto start_time = high_resolution_clock::now();
 
-        // Create a random number generator for the key selection
+        // create a random number generator for the key selection
         random_device rd;
         mt19937 rng(rd());
         uniform_int_distribution<> dis(0, size - 1);
 
-        // Perform the queries
+        // perform the queries
         for (int i = 0; i < queries; i++) {
             int random_key = dis(rng);  // generate a random key
             try {
-                // kvStore->get(900);  // test if buffer works
                 kvStore->get(random_key);
             } catch (const runtime_error& e) {
-                cerr << "key not found" << endl;
+                cerr << "key not found, " << "curr size: " << size
+                     << ", key: " << random_key << endl;
             }
         }
 
@@ -61,28 +70,29 @@ void run_experiment(const vector<int>& data_sizes, int queries,
             duration_cast<milliseconds>(end_time - start_time);
         double duration_seconds = duration_milliseconds.count() / 1000.0;
 
-        // calculate throughput (queries per second)
-        double throughput = static_cast<double>(queries) / duration_seconds;
+        // calculate throughput (KB per second)
+        double throughput =
+            static_cast<double>(queries * KVPAIR_SIZE / (1 << 10)) /
+            duration_seconds;
 
         // output to csv
-        output_file << size << "," << throughput << "," << duration_seconds
-                    << "\n";
-        cout << "Data size: " << size << " | Throughput: " << throughput
-             << " queries/sec | Time Taken: " << duration_seconds
-             << " seconds\n";
-
-        kvStore->deleteDb();
+        output_file << dataSizeGB << "," << throughput << ","
+                    << duration_seconds << "\n";
+        cout << std::setprecision(4) << "Throughput: " << throughput
+             << " KB/s | Time Taken: " << duration_seconds << " s\n";
     }
 
+    kvStore->deleteDb();
     output_file.close();
 }
 
 int main() {
     // test data sizes (number of key value pairs)
-    vector<int> data_sizes = {10000, 30000, 50000, 70000, 90000, 110000, 130000, 150000, 170000, 190000};
-    int queries = 10000;
+    int totalKVPairs = (1 << 30) / KVPAIR_SIZE;  // 1GB data size
+    int intervals = 8;                           // interval size
+    int queries = (1 << 10) / 8;                 // query 1KB of data
 
-    run_experiment(data_sizes, queries, "query_throughput.csv");
+    run_experiment(totalKVPairs, intervals, queries, "query_throughput.csv");
 
     return 0;
 }
