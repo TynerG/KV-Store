@@ -82,11 +82,10 @@ int SSTController::readMetaData() {
 
 bool SSTController::save(vector<array<int, 2>> theKVPairs) {
     if (theKVPairs.empty()) return true;
-    std::cerr << "OPEN FILE\n";
 
     std::string newPath = newSSTPath();
     const char *sstPath = newPath.c_str();
-    int fd = open(sstPath, O_WRONLY | O_CREAT | O_DIRECT);
+    int fd = open(sstPath, O_WRONLY | O_CREAT | O_DIRECT, 0777);
     if (fd < 0) {
         std::cerr << "Error opening file for direct I/O: " << strerror(errno)
                   << std::endl;
@@ -95,7 +94,7 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
 
     char *buffer;
 
-    // Allocate aligned memory for Direct I/O
+    // allocate aligned memory for direct I/O
     if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
         std::cerr << "Error allocating aligned memory for direct I/O"
                   << std::endl;
@@ -110,29 +109,15 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
 
     size_t pairsWritten = 0;
     for (size_t pageNum = 0; pageNum < numPages; ++pageNum) {
-        // Calculate how many key-value pairs can fit in the current page
+        // calculate how many key-value pairs can fit in the current page
         size_t numKVPairsToWrite =
             std::min(numKVPairsInPage, totalPairs - pairsWritten);
 
-        // Copy the data for this page into the buffer
+        // copy the data for this page into the buffer
         memcpy(buffer, &theKVPairs[pageNum * numKVPairsInPage],
                numKVPairsToWrite * KVPAIR_SIZE);
 
-        // if (numKVPairsToWrite < numKVPairsInPage) {
-        //     // Fill the remaining page with zeros
-        //     memset(buffer + numKVPairsToWrite * KVPAIR_SIZE, 0,
-        //            (PAGE_SIZE - numKVPairsToWrite * KVPAIR_SIZE));
-        // }
-
-        // // Print the key-value pairs in the buffer
-        // std::cerr << "Buffer content for page " << pageNum << ":\n";
-        // for (size_t i = 0; i < numKVPairsInPage; i++) {
-        //     std::cerr << "Key: " << ((array<int, 2> *)buffer)[i][0]
-        //               << " Value: " << ((array<int, 2> *)buffer)[i][1]
-        //               << std::endl;
-        // }
-
-        // Write the buffer to the SST file using pwrite (at an offset)
+        // write the buffer to the SST file using pwrite (at an offset)
         int offset = pageNum * PAGE_SIZE;
         ssize_t bytesWritten =
             pwrite(fd, buffer, numKVPairsToWrite * KVPAIR_SIZE, offset);
@@ -144,14 +129,14 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
             return false;
         }
 
-        // Update the number of pairs written
+        // update the number of pairs written
         pairsWritten += numKVPairsToWrite;
     }
 
     free(buffer);
     close(fd);
 
-    // Update the metadata
+    // update the metadata
     myNumSST++;
     updateMetaData();
 
@@ -159,7 +144,7 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
 }
 
 vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
-    // Open file with Direct I/O to bypass OS cache
+    // open file with Direct I/O to bypass OS cache
     std::string path = existingSSTPath(theSSTIdx);
     const char *sstPath = path.c_str();
     int fd = open(sstPath, O_RDONLY | O_DIRECT);
@@ -167,9 +152,20 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
         throw runtime_error("Error opening file for direct I/O");
     }
 
+    // get the file size using fstat
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) < 0) {
+        std::cerr << "Error getting file size: " << strerror(errno)
+                  << std::endl;
+        close(fd);
+        throw runtime_error("Error getting file size");
+    }
+    size_t fileSize = fileStat.st_size;
+    size_t numKVPairsInFile = fileSize / KVPAIR_SIZE;
+
     char *buffer = nullptr;
 
-    // Allocate memory on page boundary
+    // allocate memory on page boundary
     if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
         std::cerr << "Error allocating aligned memory for direct I/O"
                   << std::endl;
@@ -177,24 +173,33 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
         throw runtime_error("Memory allocation failed");
     }
 
-    int numKVPairs = PAGE_SIZE / KVPAIR_SIZE;
+    int numKVPairsPerPage = PAGE_SIZE / KVPAIR_SIZE;
     vector<array<int, 2>> allKVPairs;
     int pageNum = 0;
 
-    // Read the file page by page using pread (with offset)
+    // read the file page by page
     while (true) {
-        // Check buffer pool for page first
+        int remainingKVPairs = numKVPairsInFile - (pageNum * numKVPairsPerPage);
+        if (remainingKVPairs <= 0) {
+            break;
+        }
+        // last page might not be full, don't want to read zero paddings
+        int kvPairsToRead = std::min(remainingKVPairs, numKVPairsPerPage);
+
+        // check buffer pool for page first
         vector<array<int, 2>> pageKVPairs =
             bufferPool.getPage(theSSTIdx, pageNum);
 
         if (pageKVPairs.empty()) {
-            // Page not in buffer pool, so do an I/O and add the page to buffer
+            // page not in buffer pool, so do an I/O and add the page to buffer
             // pool
-            vector<array<int, 2>> ioKVPairs(numKVPairs);
+            vector<array<int, 2>> ioKVPairs(kvPairsToRead);
 
-            ssize_t result = pread(fd, buffer, PAGE_SIZE, pageNum * PAGE_SIZE);
+            int offset = pageNum * PAGE_SIZE;
+            ssize_t result =
+                pread(fd, buffer, kvPairsToRead * KVPAIR_SIZE, offset);
             if (result == 0) {
-                break;  // End of file
+                break;  // end of file
             }
             if (result <= 0) {
                 std::cerr << "Error reading data: " << strerror(errno)
@@ -204,13 +209,12 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
                 throw runtime_error("Error reading SSTs");
             }
 
-            allKVPairs.resize(allKVPairs.size() + numKVPairs);
-            // Copy data from buffer to vector
+            // copy data from buffer to vector
             memcpy(ioKVPairs.data(), buffer, result);
             pageKVPairs = ioKVPairs;
         }
 
-        // Add to all
+        // add to all
         allKVPairs.insert(allKVPairs.end(), pageKVPairs.begin(),
                           pageKVPairs.end());
         pageNum++;
