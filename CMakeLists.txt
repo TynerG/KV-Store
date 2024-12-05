@@ -15,10 +15,10 @@ include_directories(include)
 add_executable(main main.cpp
         include/AVLTree.h
         src/AVLTree.cpp
-#        include/KVStore.h
-#        src/KVStore.cpp
-#        include/SSTController.h
-#        src/SSTController.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        include/SSTController.h
+        src/SSTController.cpp
         include/BufferPool.h
         src/BufferPool.cpp
         include/LSMController.h
@@ -26,32 +26,32 @@ add_executable(main main.cpp
         include/LSMStore.h
         src/LSMStore.cpp)
 
-## Add the test executable
-#add_executable(tests tests/tests.cpp
-#        include/AVLTree.h
-#        src/AVLTree.cpp
-##        include/KVStore.h
-##        src/KVStore.cpp
-##        include/SSTController.h
-##        src/SSTController.cpp
-#        include/BufferPool.h
-#        src/BufferPool.cpp
-#        include/LSMController.h
-#        src/LSMController.cpp
-#        include/LSMStore.h
-#        src/LSMStore.cpp)
+# Add the test executable
+add_executable(tests tests/tests.cpp
+        include/AVLTree.h
+        src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        include/SSTController.h
+        src/SSTController.cpp
+        include/BufferPool.h
+        src/BufferPool.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp)
 
-## Add the queryThroughput executable
-#add_executable(queryThroughput tests/queryThroughput.cpp
-#        include/AVLTree.h
-#        src/AVLTree.cpp
-#        include/KVStore.h
-#        src/KVStore.cpp
-#        include/SSTController.h
-#        src/SSTController.cpp
-#        include/BufferPool.h
-#        src/BufferPool.cpp
-#        include/LSMController.h
-#        src/LSMController.cpp
-#        include/LSMStore.h
-#        src/LSMStore.cpp)
+# Add the queryThroughput executable
+add_executable(queryThroughput tests/queryThroughput.cpp
+        include/AVLTree.h
+        src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        include/SSTController.h
+        src/SSTController.cpp
+        include/BufferPool.h
+        src/BufferPool.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp)

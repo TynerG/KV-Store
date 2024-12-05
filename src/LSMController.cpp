@@ -18,8 +18,8 @@
 
 #include "SSTController.h"
 
-string METADATA_FILENAME = "metadata";
-string SST_FILENAME = "sst-";
+string METADATA_FILENAME_LSM = "metadata";
+string SST_FILENAME_LSM = "sst-";
 int SIZE_RATIO = 2;
 
 LSMController::LSMController(string theDbName, int bufferPoolCapacity)
@@ -36,7 +36,7 @@ LSMController::LSMController(string theDbName, int bufferPoolCapacity)
 
 int LSMController::updateMetaData() {
     cout << "Storing Metadata..." << endl;
-    ofstream outputFile(buildPath(METADATA_FILENAME));
+    ofstream outputFile(buildPath(METADATA_FILENAME_LSM));
     if (!outputFile) {
         return -1;
     }
@@ -57,7 +57,7 @@ int LSMController::updateMetaData() {
 
 int LSMController::readMetaData() {
     cout << "Loading Metadata..." << endl;
-    ifstream inputFile(buildPath(METADATA_FILENAME));
+    ifstream inputFile(buildPath(METADATA_FILENAME_LSM));
     if (!inputFile) {
         return -1;
     }
@@ -367,19 +367,19 @@ string LSMController::buildPath(string theFilePath) {
 string LSMController::newSSTPath(int theLevel) {
     if (myLevelMap[theLevel] == SIZE_RATIO) {
         // {DBName}/level-{theLevel}/sst-3
-        return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME + "3");
+        return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + "3");
     }
     if (myLevelMap[theLevel] == SIZE_RATIO - 1) {
         // level-{theLevel}/sst-2
-        return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME + "2");
+        return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + "2");
     }
 
     // level-{theLevel}/sst-1
-    return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME + "1");
+    return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + "1");
 }
 
 string LSMController::existingSSTPath(int theLevel, int theSSTNum) {
-    return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME + to_string(theSSTNum));
+    return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + to_string(theSSTNum));
 }
 
 int LSMController::searchSST(const vector<array<int, 2>> &theKVPairs,
