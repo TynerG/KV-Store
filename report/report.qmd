@@ -1,0 +1,115 @@
+---
+title: "KV Store Project Report"
+author: "Kevin Cai, Junsong Guo"
+date: today
+date-format: long
+format: pdf
+number-sections: true
+---
+
+# Introduction
+
+In this report, we present the implementation of a key-value (KV) store as part of the course project for CSC443. Out KV store database is can store keys and values as 4 byte integers. The database can be accessed by the user in their terminal with a CLI, which supports insert, update, and delete operations. The database uses combination of in-memory structures and disk storage, to manage large amount of data in gigabytes. This implementation uses a Memtable, Sorted String Tables (SSTs), a buffer pool, and a LSM Tree with a Bloom filter, and advanced query techniques to optimize for both storage and retrieval performance.
+
+# Design Details
+
+## CLI
+
+Users can interact with the database locally using our command-line interface (CLI). Below is a list of all the available commands:
+
+```bash
+put <key> <value>          : Inserts a key-value pair into the KV store.
+get <key>                  : Retrieves the value associated with a given key.
+scan <low> <high>          : Scans and retrieves all KV-pairs in the range 
+                             [low, high].
+open <dbName> <memtableSize> <bufferCapacity> : 
+                             Opens the KV store with the specified parameters.
+close                      : Saves and closes the KV store.
+delete                     : Deletes the current opened KV store.
+exit                       : Exits the program.
+help                       : Displays a help message.
+```
+
+
+## Memtable
+
+The memtable is implemented as a balanced binary tree (AVL tree). It stores key-value pairs in memory and supports the basic KV-store operations (Put, Get, and Scan). When the memtable reaches its size limit, or when the user closes the database connection in the CLI, key-value pairs stored in the memtable is converted into an SST.
+
+## SST
+
+Sorted String Tables (SSTs) are used to store data on disk. The `Get` and `Scan` operations on SSTs use binary search to quickly locate keys, by taking advantage of the sorted nature of the SSTs. Since a buffer pool is used for the database, the SST I/O operations uses direct I/O to avoid double buffering from the OS and our buffer pool. Read and writes to SSTs are done in 4KB sized pages. 
+
+## Buffer pool
+
+The buffer pool caches frequently accessed pages in memory to minimize disk I/O. The buffer pool uses a hash table with xxhash function (2016 Stephan Brumme). Hash collisions are resolved by chaining, which is implemented as a linked list for each hash table cell, and the newly hashed page is added to the end of the linked list. The eviction policy we chose is Clock eviction, as it's a fast approximation of the LRU eviction policy. Dirty pages (pages that are modified) in the buffer pool are written to the corresponding SST when the page is evicted.
+
+## LSM-tree for SSTs
+
+# Experiments
+
+```{python}
+#| echo: false
+import matplotlib.pyplot as plt
+import pandas as pd
+import os
+```
+
+## SST binary search performance
+
+We tested the 'get' query throughput of our database using only the memtable, buffer pool, and SSTs with binary search. For this experiment, the memtable was set to 1 MB, each page in the buffer pool was 10 MB, and up to 1 GB of data was inserted into the database. The performance of the 'get' query was measured at 8 intervals during the insertion process by recording the time to retrieve 1 KB of uniformly random key value data inserted at the time. @fig-bin-search-get shows the result of the experiment.
+
+```{python}
+#| echo: false
+#| label: fig-bin-search-get
+#| fig-cap: "KV Store Throughput and Time Taken vs Data Size"
+
+filename = "bin_search_get_throughput"
+data_path = os.path.join("./data", f"{filename}.csv")
+
+# read the CSV file
+df = pd.read_csv(data_path)
+
+# extract data for plotting
+data_sizes = df['Data Size (GB)'].values
+throughputs = df['Throughput (KB/s)'].values
+time_taken = df['Time Taken (s)'].values
+
+# create the figure and axis objects
+fig, ax1 = plt.subplots()
+
+# plot throughput on the left y-axis
+ax1.set_xlabel("Data Size (GB)")
+ax1.set_ylabel("Throughput (KB/s)", color="b")
+ax1.plot(
+    data_sizes,
+    throughputs,
+    color="b",
+    marker="o",
+    linestyle="-",
+    label="Throughput (KB/s)",
+)
+ax1.tick_params(axis="y", labelcolor="b")
+
+# plot time taken
+ax2 = ax1.twinx()
+ax2.set_ylabel("Time Taken (s)", color="r")
+ax2.plot(
+    data_sizes,
+    time_taken,
+    color="r",
+    marker="x",
+    linestyle="--",
+    label="Time Taken (seconds)",
+)
+ax2.tick_params(axis="y", labelcolor="r")
+
+fig.tight_layout()
+plt.show()
+```
+
+
+# Compilation and Running Instructions
+
+To compile the project, use the following command:
+
+# Testing
