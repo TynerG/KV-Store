@@ -127,7 +127,7 @@ void BufferPool::evictPage() {
                 cout << "Writing dirty page not implemented!" << endl;
             }
 
-            // remove the page from buffer
+            // remove the page from buffer pool chain
             if (frame->next != nullptr) {
                 bufferFrames[clockHand] = frame->next;
             } else {

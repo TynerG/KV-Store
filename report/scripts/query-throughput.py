@@ -2,12 +2,11 @@ import matplotlib.pyplot as plt
 import csv
 import os
 
-# Initialize lists for data
 data_sizes = []
 throughputs = []
 time_taken = []
 
-filename = "bin_tree_get_throughput"
+filename = "bin_search_get_throughput"
 
 # read data from CSV
 script_dir = os.path.dirname(os.path.abspath(__file__))
