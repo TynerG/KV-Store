@@ -12,22 +12,46 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 include_directories(include)
 
 # Add the main executable
-add_executable(main main.cpp 
+add_executable(main main.cpp
+        include/AVLTree.h
         src/AVLTree.cpp
-        src/KVStore.cpp
-        src/SSTController.cpp
-        src/BufferPool.cpp)
+#        include/KVStore.h
+#        src/KVStore.cpp
+#        include/SSTController.h
+#        src/SSTController.cpp
+        include/BufferPool.h
+        src/BufferPool.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp)
 
-# Add the test executable
-add_executable(tests tests/tests.cpp 
-        src/AVLTree.cpp
-        src/KVStore.cpp
-        src/SSTController.cpp
-        src/BufferPool.cpp)
+## Add the test executable
+#add_executable(tests tests/tests.cpp
+#        include/AVLTree.h
+#        src/AVLTree.cpp
+##        include/KVStore.h
+##        src/KVStore.cpp
+##        include/SSTController.h
+##        src/SSTController.cpp
+#        include/BufferPool.h
+#        src/BufferPool.cpp
+#        include/LSMController.h
+#        src/LSMController.cpp
+#        include/LSMStore.h
+#        src/LSMStore.cpp)
 
-# Add the queryThroughput executable
-add_executable(queryThroughput tests/queryThroughput.cpp
-        src/AVLTree.cpp
-        src/KVStore.cpp
-        src/SSTController.cpp
-        src/BufferPool.cpp)
+## Add the queryThroughput executable
+#add_executable(queryThroughput tests/queryThroughput.cpp
+#        include/AVLTree.h
+#        src/AVLTree.cpp
+#        include/KVStore.h
+#        src/KVStore.cpp
+#        include/SSTController.h
+#        src/SSTController.cpp
+#        include/BufferPool.h
+#        src/BufferPool.cpp
+#        include/LSMController.h
+#        src/LSMController.cpp
+#        include/LSMStore.h
+#        src/LSMStore.cpp)
