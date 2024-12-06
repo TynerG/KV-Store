@@ -12,19 +12,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 include_directories(include)
 
 # Add the main executable
-add_executable(main main.cpp
-        include/AVLTree.h
+add_executable(main main.cpp 
         src/AVLTree.cpp
         include/KVStore.h
         src/KVStore.cpp
         include/SSTController.h
         src/SSTController.cpp
         include/BufferPool.h
+        src/KVStore.cpp
+        src/SSTController.cpp
         src/BufferPool.cpp
-        include/LSMController.h
-        src/LSMController.cpp
-        include/LSMStore.h
-        src/LSMStore.cpp)
+        src/BTreeController.cpp
+        include/BTreeController.h
+        src/BTreeController.cpp)
 
 # Add the test executable
 add_executable(tests tests/tests.cpp
@@ -39,10 +39,12 @@ add_executable(tests tests/tests.cpp
         include/LSMController.h
         src/LSMController.cpp
         include/LSMStore.h
-        src/LSMStore.cpp)
+        src/LSMStore.cpp
+        include/BTreeController.h
+        src/BTreeController.cpp)
 
 # Add the queryThroughput executable
-add_executable(queryThroughput tests/queryThroughput.cpp
+add_executable(experimentBinarySearchGet tests/experimentBinarySearchGet.cpp
         include/AVLTree.h
         src/AVLTree.cpp
         include/KVStore.h
@@ -54,4 +56,22 @@ add_executable(queryThroughput tests/queryThroughput.cpp
         include/LSMController.h
         src/LSMController.cpp
         include/LSMStore.h
-        src/LSMStore.cpp)
+        src/LSMStore.cpp
+        include/BTreeController.h
+        src/BTreeController.cpp)
+
+add_executable(experimentBTreeGet tests/experimentBTreeGet.cpp
+        include/AVLTree.h
+        src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        include/SSTController.h
+        src/SSTController.cpp
+        include/BufferPool.h
+        src/BufferPool.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp
+        include/BTreeController.h
+        src/BTreeController.cpp)

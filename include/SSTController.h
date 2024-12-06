@@ -5,9 +5,9 @@
 #ifndef AVLTREEPROJECT_SSTCONTROLLER_H
 #define AVLTREEPROJECT_SSTCONTROLLER_H
 
-#include <iostream>
-#include <fstream>
 #include <array>
+#include <fstream>
+#include <iostream>
 #include <vector>
 
 #include "BufferPool.h"
@@ -18,7 +18,7 @@ using namespace std;
  * Represents and controls the SST part of the KV store.
  */
 class SSTController {
-private:
+   private:
     /**
      * BufferPool for SST pages
      */
@@ -63,28 +63,23 @@ private:
     string existingSSTPath(int theSSTIdx);
 
     /**
-     * perform a binary search on the given KV-Pairs
+     * perform a binary search on the given KV-Pairs and return the smallest
+     * element that is larger than or equal to the target
      * @param theTarget
-     * @return the index of the target, or -1 if target not found
+     * @return the index of the smallest element that is larger than or equal to
+     * the target, or -1 if target not found
      */
-    int searchSST(const vector<array<int, 2>> &theKVPairs, int theTarget);
+    int searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs,
+                                int theTarget);
 
-    /**
-     * perform a binary search on the given KV-Pairs and return the smallest element that is larger than or equal to
-     * the target
-     * @param theTarget
-     * @return the index of the smallest element that is larger than or equal to the target, or -1 if target not found
-     */
-    int searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs, int theTarget);
-
-public:
-
+   public:
     explicit SSTController(string theDbName, int bufferPoolCapacity);
 
     /**
      * Get the most up-to-date value of the given key from all SSTs.
-     * @return a pair where the first element representing whether the target is found, and the second element
-     * representing the value found (or -1 if the first element is false)
+     * @return a pair where the first element representing whether the target is
+     * found, and the second element representing the value found (or -1 if the
+     * first element is false)
      */
     pair<bool, int> get(int theKey);
 
@@ -107,6 +102,16 @@ public:
      */
     vector<array<int, 2>> readSST(int theSSTIdx);
 
+    // Returns the KV-pairs in an SST page
+    vector<array<int, 2>> readSSTPage(int sstIdx, int page);
+
+    /**
+     * perform a binary search on the given KV-Pairs
+     * @param theTarget
+     * @return the index of the target, or -1 if target not found
+     */
+    int searchSST(const vector<array<int, 2>> &theKVPairs, int theTarget);
+
     /**
      * deletes the sst files
      * @return whether the delete was successful
@@ -120,5 +125,4 @@ public:
     int getMetadata();
 };
 
-
-#endif //AVLTREEPROJECT_SSTCONTROLLER_H
+#endif  // AVLTREEPROJECT_SSTCONTROLLER_H

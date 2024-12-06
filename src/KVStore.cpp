@@ -10,6 +10,7 @@ KVStore::KVStore(int memtableSize, string dBName, int bufferCapacity) {
     myMemtableSize = memtableSize;
     myMemtable = make_shared<AVLTree>(memtableSize);
     mySSTController = make_shared<SSTController>(dBName, bufferCapacity);
+    myBTreeController = make_shared<BTreeController>(dBName, mySSTController);
 }
 
 void KVStore::deleteDb() {
@@ -103,4 +104,33 @@ vector<array<int, 2>> KVStore::mergeScanResults(
 bool KVStore::close() {
     // store the memtable into SST
     return mySSTController->save(myMemtable->scan());
+}
+
+void KVStore::createStaticBTree() { myBTreeController->createBTrees(); }
+
+int KVStore::bTreeGet(int key) {
+    int result;
+    try {
+        result = myMemtable->getValue(key);
+    } catch (const exception &e) {
+        // if not found in memtable, search the SSTs instead
+        if (strcmp(e.what(), "Key not found") == 0) {
+            const pair<bool, int> &pair = mySSTController->get(key);
+
+            if (pair.first) {
+                result = pair.second;
+            } else {
+                throw std::runtime_error("Key not found");
+            }
+        }
+    }
+
+    const pair<bool, int> &pair = myBTreeController->get(key);
+    if (pair.first) {
+        result = pair.second;
+    } else {
+        throw std::runtime_error("Key not found");
+    }
+
+    return result;
 }

@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "./AVLTree.h"
+#include "./BTreeController.h"
 #include "./SSTController.h"
 
 /**
@@ -20,6 +21,8 @@ class KVStore {
     shared_ptr<AVLTree> myMemtable;
 
     shared_ptr<SSTController> mySSTController;
+
+    shared_ptr<BTreeController> myBTreeController;
 
     vector<array<int, 2>> mergeScanResults(
         const vector<array<int, 2>> &scanMem,
@@ -63,6 +66,17 @@ class KVStore {
      * Delete the database and all its files
      */
     void deleteDb();
+
+    /**
+     * Converts the current SST into a static B Tree
+     */
+    void createStaticBTree();
+
+    /**
+     * Retrieves a value associated with a given key using B-tree search
+     * @return the value associated with the given key
+     */
+    int bTreeGet(int key);
 };
 
 #endif  // AVLTREEPROJECT_KVSTORE_H
