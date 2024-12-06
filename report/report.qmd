@@ -164,7 +164,9 @@ plt.show()
 
 Using the same environment, memtable size, buffer pool size, and data size, as in experiment @sec-bin-search-get, we tested the `Get` query throughput of the static B-Tree. @fig-b-search-get shows the result of the experiment. Get query throughput with our B-tree implementation was slower than our binary search implementation. Theoretically, the B-tree should have a faster running time of $O(\log_B(N))$, whereas binary search has a running time of $O(\log_2(N))$. We suspect that since we only used B-tree on SST of size 1 MB, maybe the size is not large enough to see a speed improvement, as our B-tree only has one level, and data is not pruned significantly compared to binary search. 
 
-This experiement can be reproduced by executing the binary file `experimentBTreeGet` in the build directory. 
+These experiements can be reproduced by executing the binary file `experimentBTree` in the build directory. 
+
+Please note that these experiments take much longer to run. (over 2.5 hours to run all three of them on our machine with 16 GB ram and 12gen intel CPU.)
 
 ```{python}
 #| echo: false
