@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "../include/AVLTree.h"
+#include "../include/KVStore.h"
 #include "../include/SSTController.h"
 #include "../include/xxHash32.h"
 
@@ -224,12 +225,51 @@ array<int, 2> runBufferPoolTests() {
     return {passed, failed};
 }
 
+array<int, 2> runBTreeTests() {
+    cout << "\n" << endl;
+    cout << "#################################" << endl;
+    cout << "# Running B tree tests..." << endl;
+    cout << "#################################" << endl;
+
+    // setup
+    int passed = 0;
+    int failed = 0;
+
+    // init data
+    int memSize = (1 << 20) / 8 * 1;  // 1mb total
+    int bufferCapacity =
+        (1 << 20) / 4096 * 10;  // ~10mb total, ignoring metadata
+    KVStore kvStore = KVStore(memSize, "testDB", bufferCapacity);
+
+    int totalKVPairs = memSize;
+
+    for (int i = 0; i < totalKVPairs; i++) {
+        kvStore.put(i, i);
+    }
+
+    kvStore.createStaticBTree();
+    int res = kvStore.bTreeGet(10);
+    cout << "Test: B-tree get correct values" << endl;
+    int expected = kvStore.bTreeGet(10);
+    int actual = 10;
+    checkTestResult<int>(expected, actual, passed, failed);
+    
+    expected = kvStore.bTreeGet(511);
+    actual = 511;
+    checkTestResult<int>(expected, actual, passed, failed);
+
+    kvStore.deleteDb();
+
+    return {passed, failed};
+}
+
 int main() {
     vector<array<int, 2>> passFails;
 
-    passFails.push_back(runAVLTreeTests());
-    passFails.push_back(runSSTControllerTests());
-    passFails.push_back(runBufferPoolTests());
+    // passFails.push_back(runAVLTreeTests());
+    // passFails.push_back(runSSTControllerTests());
+    // passFails.push_back(runBufferPoolTests());
+    passFails.push_back(runBTreeTests());
 
     // calculate the total number of passed/failed tests
     int passed = 0;

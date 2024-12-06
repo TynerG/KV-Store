@@ -106,41 +106,87 @@ bool SSTController::save(vector<array<int, 2>> theKVPairs) {
 }
 
 vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
-    ifstream inputFile(existingSSTPath(theSSTIdx), ios::binary);
-    if (!inputFile) {
-        throw runtime_error("Error when reading SSTs");
+    std::string path = existingSSTPath(theSSTIdx);
+    const char *sstPath = path.c_str();
+    int fd = open(sstPath, O_RDONLY);
+    if (fd < 0) {
+        throw runtime_error("Error opening file for direct I/O");
     }
 
-    vector<array<int, 2>> kvPairs;
+    // get the file size using fstat
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) < 0) {
+        std::cerr << "Error getting file size: " << strerror(errno)
+                  << std::endl;
+        close(fd);
+        throw runtime_error("Error getting file size");
+    }
+    size_t fileSize = fileStat.st_size;
+    size_t numKVPairsInFile = fileSize / KVPAIR_SIZE;
 
-    char buffer[PAGE_SIZE];
+    int numKVPairsPerPage = PAGE_SIZE / KVPAIR_SIZE;
+    vector<array<int, 2>> allKVPairs;
     int pageNum = 0;
-    while (inputFile) {
+
+    // Read the file page by page
+    while (true) {
+        int remainingKVPairs = numKVPairsInFile - (pageNum * numKVPairsPerPage);
+        if (remainingKVPairs <= 0) {
+            break;
+        }
+
         // check buffer pool for page first
         vector<array<int, 2>> pageKVPairs =
             bufferPool.getPage(bufferPool.makePageId(theSSTIdx, pageNum));
         if (pageKVPairs.empty()) {
-            // read the file page by page
-            inputFile.read(buffer, sizeof(buffer));
-            streamsize bytesRead = inputFile.gcount();
-            if (bytesRead <= 0) break;  // no more data to read
+            // page not in buffer pool, so do an I/O and add the page to buffer
+            pageKVPairs = readSSTPage(theSSTIdx, pageNum);
 
-            // not in buffer pool, so do an I/O and add the page to buffer pool
-            int numKVPairs = bytesRead / KVPAIR_SIZE;
-            vector<array<int, 2>> ioKVPairs(numKVPairs);
-
-            memcpy(ioKVPairs.data(), buffer, bytesRead);
-            pageKVPairs = ioKVPairs;
-            bufferPool.putPage(bufferPool.makePageId(theSSTIdx, pageNum), ioKVPairs);
+            if (pageKVPairs.empty()) {
+                throw runtime_error("Error reading from buffer pool");
+            }
         }
 
-        // add to all
-        kvPairs.insert(kvPairs.end(), pageKVPairs.begin(), pageKVPairs.end());
+        // add the KVPairs from the page to allKVPairs
+        allKVPairs.insert(allKVPairs.end(), pageKVPairs.begin(),
+                          pageKVPairs.end());
         pageNum++;
     }
 
-    inputFile.close();
-    return kvPairs;
+    close(fd);
+    return allKVPairs;
+}
+
+vector<array<int, 2>> SSTController::readSSTPage(int sstIdx, int page) {
+    // open the SST file
+    std::string path = existingSSTPath(sstIdx);
+    const char *sstPath = path.c_str();
+    int fd = open(sstPath, O_RDONLY);
+    if (fd < 0) {
+        throw runtime_error("Error opening file for direct I/O");
+    }
+
+    char *buffer = nullptr;
+    if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
+        close(fd);
+        throw runtime_error("Memory allocation failed for page read");
+    }
+
+    int offset = page * PAGE_SIZE;
+    ssize_t result = pread(fd, buffer, PAGE_SIZE, offset);
+
+    if (result <= 0) {
+        free(buffer);
+        close(fd);
+        throw runtime_error("Error reading SST page");
+    }
+
+    vector<array<int, 2>> pageKVPairs(result / KVPAIR_SIZE);
+    memcpy(pageKVPairs.data(), buffer, result);
+
+    free(buffer);
+    close(fd);
+    return pageKVPairs;
 }
 
 pair<bool, int> SSTController::get(int theKey) {
