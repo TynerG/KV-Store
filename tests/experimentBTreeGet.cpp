@@ -14,7 +14,7 @@ using namespace std::chrono;
 
 // Function to measure throughput of B-tree get operation
 void run_btree_get_experiment(int totalKVPairs, int intervals, int queries,
-                               const string& filename) {
+                              const string& filename) {
     int intervalSize = static_cast<int>(totalKVPairs / intervals);
 
     // Open the CSV file to save results
@@ -61,7 +61,9 @@ void run_btree_get_experiment(int totalKVPairs, int intervals, int queries,
         for (int i = 0; i < queries; i++) {
             int random_key = dis(rng);  // Generate a random key
             try {
-                kvStore.bTreeGet(random_key);  // Use B-tree search
+                int value = kvStore.bTreeGet(random_key);  // Use B-tree search
+                cout << "key: " << random_key << endl;
+                cout << "value: " << value << endl;
             } catch (const runtime_error& e) {
                 cerr << "key not found, " << "curr size: " << size
                      << ", key: " << random_key << endl;
@@ -75,10 +77,12 @@ void run_btree_get_experiment(int totalKVPairs, int intervals, int queries,
 
         // Calculate throughput (KB per second)
         double throughput =
-            static_cast<double>(queries * KVPAIR_SIZE / (1 << 10)) / duration_seconds;
+            static_cast<double>(queries * KVPAIR_SIZE / (1 << 10)) /
+            duration_seconds;
 
         // Output results to CSV
-        output_file << dataSizeGB << "," << throughput << "," << duration_seconds << "\n";
+        output_file << dataSizeGB << "," << throughput << ","
+                    << duration_seconds << "\n";
         cout << std::setprecision(4) << "Throughput: " << throughput
              << " KB/s | Time Taken: " << duration_seconds << " s\n";
     }
@@ -90,10 +94,11 @@ void run_btree_get_experiment(int totalKVPairs, int intervals, int queries,
 int main() {
     // Test data sizes (number of key-value pairs)
     int totalKVPairs = (1 << 30) / KVPAIR_SIZE;  // 1GB data size
-    int intervals = 8;  // Interval size for different data sizes
+    int intervals = 8;            // Interval size for different data sizes
     int queries = (1 << 10) / 8;  // Query 1KB of data (can adjust as needed)
 
-    run_btree_get_experiment(totalKVPairs, intervals, queries, "btree_query_throughput.csv");
+    run_btree_get_experiment(totalKVPairs, intervals, queries,
+                             "btree_query_throughput.csv");
 
     return 0;
 }

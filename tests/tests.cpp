@@ -406,10 +406,10 @@ array<int, 2> runLSMControllerTests() {
 int main() {
     vector<array<int, 2>> passFails;
 
-//    passFails.push_back(runAVLTreeTests());
-//    passFails.push_back(runSSTControllerTests());
-//    passFails.push_back(runBufferPoolTests());
-//    passFails.push_back(runBTreeTests());
+    passFails.push_back(runAVLTreeTests());
+    passFails.push_back(runSSTControllerTests());
+    passFails.push_back(runBufferPoolTests());
+    passFails.push_back(runBTreeTests());
     passFails.push_back(runLSMControllerTests());
 
     // calculate the total number of passed/failed tests
