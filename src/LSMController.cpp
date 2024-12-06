@@ -12,11 +12,14 @@
 #include <filesystem>
 #include <utility>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "BufferPool.h"
 #include "Constants.h"
 
 #include "SSTController.h"
+
+namespace fs = std::filesystem;
 
 string METADATA_FILENAME_LSM = "metadata";
 string SST_FILENAME_LSM = "sst-";
@@ -108,7 +111,49 @@ bool LSMController::save(vector<array<int, 2>> theKVPairs, int theLevel) {
     return true;
 }
 
+//bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) {
+//    // insert the KVPairs into the given level
+//    string pathToSST = newSSTPath(theLevel);
+//    // create the directory first if it does not exist already
+//    string pathToDir = pathToSST.substr(0, pathToSST.size() - 6);
+//    if (access(pathToDir.c_str(), F_OK) == -1) {
+//        if (mkdir(pathToDir.c_str(), 0777) != 0) {
+//            cout << "error when creating directory for level: " + to_string(theLevel) << endl;
+//            return false;
+//        }
+//    }
+//    ofstream outputFile(pathToSST);
+//
+//    if (!outputFile) {
+//        return false;
+//    }
+//
+//    cout << "writing [" << theKVPairs.size() * sizeof(array<int, 2>) << "] bits of data" << endl;
+//    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()),
+//                     theKVPairs.size() * sizeof(array<int, 2>));
+//
+//
+//    if (outputFile.fail()) {
+//        return false;
+//    }
+//
+//    outputFile.close();
+//
+//    // update the metadata
+//    // if the first level does not exist yet
+//    if (myLevelMap.find(theLevel) == myLevelMap.end()) {
+//        myLevelMap[theLevel] = 1;
+//    } else {
+//        myLevelMap[theLevel] += 1;
+//    }
+//
+//    return true;
+//}
+
 bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) {
+    // return if empty pairs
+    if (theKVPairs.empty()) return true;
+
     // insert the KVPairs into the given level
     string pathToSST = newSSTPath(theLevel);
     // create the directory first if it does not exist already
@@ -119,20 +164,58 @@ bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) 
             return false;
         }
     }
-    ofstream outputFile(pathToSST);
 
-    if (!outputFile) {
+    int fd = open(pathToSST.c_str(), O_WRONLY | O_CREAT , 0777);
+    if (fd < 0) {
+        std::cerr << "Error opening file for direct I/O: " << strerror(errno)
+                  << std::endl;
         return false;
     }
 
-    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()),
-                     theKVPairs.size() * sizeof(array<int, 2>));
+    char *buffer;
 
-    if (outputFile.fail()) {
+    // allocate aligned memory for direct I/O
+    if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
+        std::cerr << "Error allocating aligned memory for direct I/O"
+                  << std::endl;
+        ::close(fd);
         return false;
     }
 
-    outputFile.close();
+    size_t totalPairs = theKVPairs.size();
+    size_t totalSize = totalPairs * KVPAIR_SIZE;
+    size_t numPages = (totalSize + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t numKVPairsInPage = PAGE_SIZE / KVPAIR_SIZE;
+    cerr << "performaing save for [" << totalSize << "] bits of data" << endl;
+
+    size_t pairsWritten = 0;
+    for (size_t pageNum = 0; pageNum < numPages; ++pageNum) {
+        // calculate how many key-value pairs can fit in the current page
+        size_t numKVPairsToWrite =
+            std::min(numKVPairsInPage, totalPairs - pairsWritten);
+
+        // copy the data for this page into the buffer
+        memcpy(buffer, &theKVPairs[pageNum * numKVPairsInPage],
+               numKVPairsToWrite * KVPAIR_SIZE);
+
+        // write the buffer to the SST file using pwrite (at an offset)
+        int offset = pageNum * PAGE_SIZE;
+        ssize_t bytesWritten =
+            pwrite(fd, buffer, numKVPairsToWrite * KVPAIR_SIZE, offset);
+        if (bytesWritten < 0) {
+            std::cerr << "Error writing data: " << strerror(errno)
+                      << " (errno: " << errno << ")" << std::endl;
+            free(buffer);
+            ::close(fd);
+            return false;
+        }
+
+        // update the number of pairs written
+        pairsWritten += numKVPairsToWrite;
+    }
+
+    free(buffer);
+    ::close(fd);
 
     // update the metadata
     // if the first level does not exist yet
@@ -273,7 +356,6 @@ vector<array<int, 2>> LSMController::scan(int theLow, int theHigh) {
     }
 
     // sort the result based on key
-    // TODO: any ways to avoid the sort?
     sort(result.begin(), result.end(),
          [](const array<int, 2> &a, const array<int, 2> b) {
              return a[0] < b[0];
