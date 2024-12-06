@@ -8,7 +8,10 @@ This project is developed for the CSC443 course. It includes a main application 
 
 ## Prequisites
 - Ensure you have CMake installed
-- The project uses C++11
+- The project uses C++17
+
+## Report
+Please see the [Report](report/report.pdf) for a detailed description of the project.
 
 ## Compile
 
