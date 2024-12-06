@@ -1,6 +1,10 @@
 # CSC443-Fall-2024-Project
 
-This project is developed for the CSC443 course. It implements an AVL tree data structure and includes a main application along with test files.
+This project is developed for the CSC443 course. It includes a main application along with test files that can be built using instructions below. The structure of this directory is as follows:
+- `report`: contains our report in report.pdf, and data from experiments.
+- `src`: contains source files.
+- `include`: contains header files.
+- `tests`: contains test files.
 
 ## Prequisites
 - Ensure you have CMake installed

@@ -30,7 +30,7 @@ exit                       : Exits the program.
 help                       : Displays a help message.
 ```
 
-`<memtableSize>` and `<bufferCapacity>` are both specified in terms of number of key-value pairs, and these parameters can be changed each time the database is opened.
+`<memtableSize>` is specified in terms of number of key-value pairs and `<bufferCapacity>` is specified in the number of 4 KB pages. These parameters can be changed each time the database is opened.
 
 
 ## Memtable
@@ -39,11 +39,11 @@ The memtable is implemented as a balanced binary tree (AVL tree). It stores key-
 
 ## SST
 
-Sorted String Tables (SSTs) are used to store data on disk. The `Get` and `Scan` operations on SSTs use binary search to quickly locate keys, by taking advantage of the sorted nature of the SSTs. Since a buffer pool is used for the database, the SST I/O operations uses direct I/O to avoid double buffering from the OS and our buffer pool. Read and writes to SSTs are done in 4KB sized pages. 
+Sorted String Tables (SSTs) are used to store data on disk. The `Get` and `Scan` operations on SSTs use binary search to quickly locate keys, by taking advantage of the sorted nature of the SSTs. Since a buffer pool is used for the database, the SST I/O operations uses direct I/O to avoid double buffering from the OS and our buffer pool. Read and writes to SSTs are done in 4KB sized pages. In our final version of the database, we are not using direct I/O for read write operations, as we discovered that the `O_DIRECT` flag was not supported on Windows Subsystem for Linux (WSL), which is the environment both our team members are working on. We are only able to use direct I/O on the teach.cs machine, however conducting experiments takes a very long time even for a vew MB of data. Hence, we did not use direct I/O and our progress is left in the branch `direct-io`.
 
 ## Buffer pool
 
-The buffer pool caches frequently accessed pages in memory to minimize disk I/O. The buffer pool uses a hash table with xxhash function (2016 Stephan Brumme). Hash collisions are resolved by chaining, which is implemented as a linked list for each hash table cell, and the newly hashed page is added to the end of the linked list. The eviction policy we chose is the Clock eviction policy, as it is a fast approximation of the LRU eviction policy. Dirty pages (pages that are modified) in the buffer pool are written to the corresponding SST when the page is evicted.
+The buffer pool caches frequently accessed pages of size 4KB in memory to minimize disk I/O. The buffer pool uses a hash table with xxhash function (2016 Stephan Brumme). Hash collisions are resolved by chaining, which is implemented as a linked list for each hash table cell, and the newly hashed page is added to the end of the linked list. The eviction policy we chose is the Clock eviction policy, as it is a fast approximation of the LRU eviction policy. Whenever a page will be read using an I/O, the database first checks the buffer pool for the page and only performs an I/O if the page is not in the buffer pool, then the newly read page will be added to the buffer pool. 
 
 ## B-Tree
 
