@@ -24,7 +24,11 @@ add_executable(main main.cpp
         src/BufferPool.cpp
         src/BTreeController.cpp
         include/BTreeController.h
-        src/BTreeController.cpp)
+        src/BTreeController.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp)
 
 # Add the test executable
 add_executable(tests tests/tests.cpp
@@ -75,3 +79,21 @@ add_executable(experimentBTreeGet tests/experimentBTreeGet.cpp
         src/LSMStore.cpp
         include/BTreeController.h
         src/BTreeController.cpp)
+
+add_executable(experimentLSMTree tests/experimentLSMTree.cpp
+        src/AVLTree.cpp
+        include/KVStore.h
+        src/KVStore.cpp
+        include/SSTController.h
+        src/SSTController.cpp
+        include/BufferPool.h
+        src/KVStore.cpp
+        src/SSTController.cpp
+        src/BufferPool.cpp
+        src/BTreeController.cpp
+        include/BTreeController.h
+        src/BTreeController.cpp
+        include/LSMController.h
+        src/LSMController.cpp
+        include/LSMStore.h
+        src/LSMStore.cpp)

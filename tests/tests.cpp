@@ -324,7 +324,7 @@ array<int, 2> runLSMControllerTests() {
     LSMController controller(dbName, bufferPoolCapacity);
 
     cout << "Test: Database Creation - Directory Created" << endl;
-    string expectedDbPath = "./MyDatabase";
+    string expectedDbPath = "./MyLSMDatabase";
     struct stat info;
     bool actual = stat(expectedDbPath.c_str(), &info) == 0;
     actual = actual && (info.st_mode & S_IFDIR);

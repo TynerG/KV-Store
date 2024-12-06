@@ -150,7 +150,7 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
 
 vector<array<int, 2>> SSTController::readSSTPage(int sstIdx, int page) {
     // check buffer pool for page first
-    vector<array<int, 2>> pageKVPairs = bufferPool.getPage(sstIdx, page);
+    vector<array<int, 2>> pageKVPairs = bufferPool.getPage(bufferPool.makePageId(sstIdx, page));
 
     if (pageKVPairs.empty()) {
         // page not in buffer pool, so do an I/O and add the page to buffer
@@ -186,7 +186,7 @@ vector<array<int, 2>> SSTController::readSSTPage(int sstIdx, int page) {
         close(fd);
 
         // add the page to buffer pool
-        bufferPool.putPage(sstIdx, page, pageKVPairs);
+        bufferPool.putPage(bufferPool.makePageId(sstIdx, page), pageKVPairs);
     }
 
     return pageKVPairs;
