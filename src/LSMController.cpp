@@ -111,45 +111,6 @@ bool LSMController::save(vector<array<int, 2>> theKVPairs, int theLevel) {
     return true;
 }
 
-//bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) {
-//    // insert the KVPairs into the given level
-//    string pathToSST = newSSTPath(theLevel);
-//    // create the directory first if it does not exist already
-//    string pathToDir = pathToSST.substr(0, pathToSST.size() - 6);
-//    if (access(pathToDir.c_str(), F_OK) == -1) {
-//        if (mkdir(pathToDir.c_str(), 0777) != 0) {
-//            cout << "error when creating directory for level: " + to_string(theLevel) << endl;
-//            return false;
-//        }
-//    }
-//    ofstream outputFile(pathToSST);
-//
-//    if (!outputFile) {
-//        return false;
-//    }
-//
-//    cout << "writing [" << theKVPairs.size() * sizeof(array<int, 2>) << "] bits of data" << endl;
-//    outputFile.write(reinterpret_cast<const char *>(theKVPairs.data()),
-//                     theKVPairs.size() * sizeof(array<int, 2>));
-//
-//
-//    if (outputFile.fail()) {
-//        return false;
-//    }
-//
-//    outputFile.close();
-//
-//    // update the metadata
-//    // if the first level does not exist yet
-//    if (myLevelMap.find(theLevel) == myLevelMap.end()) {
-//        myLevelMap[theLevel] = 1;
-//    } else {
-//        myLevelMap[theLevel] += 1;
-//    }
-//
-//    return true;
-//}
-
 bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) {
     // return if empty pairs
     if (theKVPairs.empty()) return true;
