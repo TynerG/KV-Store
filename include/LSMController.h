@@ -137,6 +137,11 @@ public:
     void deleteFiles();
 
     /**
+     * Return the level map
+     */
+     unordered_map<int, int> getMetadata();
+
+    /**
      * close the LSM tree and store the metadata
      */
     bool close();

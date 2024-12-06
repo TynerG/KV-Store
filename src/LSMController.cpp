@@ -110,7 +110,6 @@ bool LSMController::save(vector<array<int, 2>> theKVPairs, int theLevel) {
 
 bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) {
     // insert the KVPairs into the given level
-    cout << "performing save for level: " + to_string(theLevel) << endl;
     string pathToSST = newSSTPath(theLevel);
     // create the directory first if it does not exist already
     string pathToDir = pathToSST.substr(0, pathToSST.size() - 6);
@@ -455,4 +454,8 @@ int LSMController::invalidateBufferPool() {
     int capacity = bufferPool.getCapacity();
     bufferPool = BufferPool(capacity);
     return 0;
+}
+
+unordered_map<int, int> LSMController::getMetadata() {
+    return myLevelMap;
 }

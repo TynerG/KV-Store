@@ -7,9 +7,42 @@
 #include "../include/KVStore.h"
 #include "../include/SSTController.h"
 #include "../include/xxHash32.h"
+#include "LSMController.h"
 
 int readIntFromPath(const string &expectedMetaDataPath);
 
+void checkLsmMetaData(unordered_map<int, int> expected, unordered_map<int, int> actual, int& passed, int& failed) {
+    // Vector to store keys
+    std::vector<int> keys;
+    for (const auto &pair: expected) {
+        keys.push_back(pair.first);
+    }
+
+    for (int i = 0; i < keys.size(); i++) {
+        if (actual[i] != expected[i]) {
+            cout << "--[Failed]" << endl;
+            cout << "Expected '" << expected[i] << "', got '" << actual[i] << "'" << endl;
+            failed++;
+            return;
+        }
+    }
+    cout << "--[Passed]" << endl;
+    passed++;
+}
+
+unordered_map<int, int> readMetaDataFromPath(const string &expectedMetaDataPath) {
+    ifstream inputFile(expectedMetaDataPath);
+
+    int key;
+    int value;
+    unordered_map<int, int> metaDataMap;
+    // Read key-value pairs from the file and populate the map
+    while (inputFile >> key >> value) {
+        metaDataMap[key] = value;
+    }
+    inputFile.close();
+    return metaDataMap;
+}
 using namespace std;
 
 // Function template to compare results of generic types
@@ -263,13 +296,121 @@ array<int, 2> runBTreeTests() {
     return {passed, failed};
 }
 
+array<int, 2> runLSMControllerTests() {
+    cout << "\n" << endl;
+    cout << "#################################" << endl;
+    cout << "# Running LSM-Tree Controller tests..." << endl;
+    cout << "#################################" << endl;
+
+    // Setup
+    int passed = 0;
+    int failed = 0;
+    int bufferPoolCapacity = 1;
+
+    // build KV-Pairs
+    AVLTree tree(8);  // Assuming 8 is the initial capacity
+    tree.insert(10, 10);
+    tree.insert(20, 20);
+    tree.insert(50, 50);
+    tree.insert(23, 123);
+    tree.insert(25, 125);
+    tree.insert(24, 124);
+    tree.insert(30, 30);
+    tree.insert(40, 40);
+    const vector<array<int, 2>> &kvPairs = tree.scan();
+
+    // init the controller
+    const string dbName = "MyLSMDatabase";
+    LSMController controller(dbName, bufferPoolCapacity);
+
+    cout << "Test: Database Creation - Directory Created" << endl;
+    string expectedDbPath = "./MyDatabase";
+    struct stat info;
+    bool actual = stat(expectedDbPath.c_str(), &info) == 0;
+    actual = actual && (info.st_mode & S_IFDIR);
+    checkTestResult<bool>(true, actual, passed, failed);
+
+    cout << "Test: Database Creation - Metadata Created" << endl;
+    string expectedMetaDataPath = "./MyLSMDatabase/metadata";
+    int result = readIntFromPath(expectedMetaDataPath);
+    checkTestResult<int>(0, result, passed, failed);
+
+    cout << "Test: Saving KV-Pairs as SST" << endl;
+    controller.save(kvPairs, 1);
+    const vector<array<int, 2>> &savedKvPairs = controller.scan(1, 100);
+    string expectedKvPairs =
+        "(10,10) (20,20) (23,123) (24,124) (25,125) (30,30) (40,40) (50,50) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs),
+                            passed, failed);
+
+    cout << "Test: Maintains Metadata" << endl;
+    // close the controller to update the metadata
+    controller.close();
+    unordered_map<int, int> expectedMetadata;
+    expectedMetadata[1] = 1;
+    unordered_map<int, int> actualMetadata = readMetaDataFromPath(expectedMetaDataPath);
+    checkLsmMetaData(expectedMetadata, actualMetadata, passed, failed);
+
+    cout << "Test: Open Existing Database" << endl;
+    LSMController controllerForExistingDb(dbName, bufferPoolCapacity);
+    actualMetadata = controllerForExistingDb.getMetadata();
+    checkLsmMetaData(expectedMetadata, actualMetadata, passed, failed);
+
+    cout << "Test: Multiple SSTs" << endl;
+    // build another SST
+    AVLTree tree2(8);  // Assuming 8 is the initial capacity or some parameter
+    tree2.insert(10, 15);
+    tree2.insert(20, 25);
+    tree2.insert(30, 35);
+    tree2.insert(40, 45);
+    tree2.insert(50, 55);
+    tree2.insert(60, 65);
+    tree2.insert(70, 75);
+    tree2.insert(80, 85);
+    const vector<array<int, 2>> &kvPairs2 = tree2.scan();
+    controller.save(kvPairs2, 1);
+
+    const vector<array<int, 2>> &savedKvPairs2 = controller.scan(1, 100);
+    expectedKvPairs =
+        "(10,15) (20,25) (23,123) (24,124) (25,125) (30,35) (40,45) (50,55) (60,65) (70,75) (80,85) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(savedKvPairs2),
+                            passed, failed);
+
+    cout << "Test: SST Get - Get The Newest Value" << endl;
+    const pair<bool, int> &pair = controller.get(10);
+    assert(true == pair.first);
+    checkTestResult<int>(15, pair.second, passed, failed);
+
+    cout << "Test: SST Get - Non-existing Key" << endl;
+    const ::pair<bool, int> &pair2 = controller.get(100);
+    assert(false == pair2.first);
+    checkTestResult<int>(-1, pair2.second, passed, failed);
+
+    cout << "Test: SST Scan" << endl;
+    const vector<array<int, 2>> &scanResult = controller.scan(19, 67);
+    expectedKvPairs =
+        "(20,25) (23,123) (24,124) (25,125) (30,35) (40,45) (50,55) (60,65) ";
+    checkTestResult<string>(expectedKvPairs, stringifyKvPairs(scanResult),
+                            passed, failed);
+
+    // Clean up test data
+    controller.deleteFiles();
+
+    // Summary of tests completed
+    cout << "Tests completed: " << passed << "/" << (passed + failed)
+         << " passed." << endl;
+    array<int, 2> passFail = {passed, failed};
+    return passFail;
+}
+
 int main() {
     vector<array<int, 2>> passFails;
 
-    // passFails.push_back(runAVLTreeTests());
-    // passFails.push_back(runSSTControllerTests());
-    // passFails.push_back(runBufferPoolTests());
-    passFails.push_back(runBTreeTests());
+//    passFails.push_back(runAVLTreeTests());
+//    passFails.push_back(runSSTControllerTests());
+//    passFails.push_back(runBufferPoolTests());
+//    passFails.push_back(runBTreeTests());
+    passFails.push_back(runLSMControllerTests());
 
     // calculate the total number of passed/failed tests
     int passed = 0;
