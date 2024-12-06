@@ -62,8 +62,8 @@ void run_btree_get_experiment(int totalKVPairs, int intervals, int queries,
             int random_key = dis(rng);  // Generate a random key
             try {
                 int value = kvStore.bTreeGet(random_key);  // Use B-tree search
-                cout << "key: " << random_key << endl;
-                cout << "value: " << value << endl;
+                // cout << "key: " << random_key << endl;
+                // cout << "value: " << value << endl;
             } catch (const runtime_error& e) {
                 cerr << "key not found, " << "curr size: " << size
                      << ", key: " << random_key << endl;
@@ -98,7 +98,7 @@ int main() {
     int queries = (1 << 10) / 8;  // Query 1KB of data (can adjust as needed)
 
     run_btree_get_experiment(totalKVPairs, intervals, queries,
-                             "btree_query_throughput.csv");
+                             "btree_get_throughput.csv");
 
     return 0;
 }
