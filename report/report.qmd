@@ -224,7 +224,7 @@ Using the same parameters again, we were able to experiment with the throughput 
 #| label: fig-lsm-put
 #| fig-cap: "LSM tree Put throughput and time taken vs data size"
 
-filename = "lsm_put_throughput"
+filename = "lsm_insert_throughput"
 data_path = os.path.join("./data", f"{filename}.csv")
 
 # read the CSV file
@@ -279,10 +279,13 @@ data_path = os.path.join("./data", f"{filename}.csv")
 # read the CSV file
 df = pd.read_csv(data_path)
 
+df = df[df['Time Taken (s)'] > 5]
+
 # extract data for plotting
 data_sizes = df['Data Size (GB)'].values
 throughputs = df['Throughput (KB/s)'].values
 time_taken = df['Time Taken (s)'].values
+
 
 # create the figure and axis objects
 fig, ax1 = plt.subplots()
