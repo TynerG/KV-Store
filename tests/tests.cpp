@@ -266,9 +266,9 @@ array<int, 2> runBTreeTests() {
 int main() {
     vector<array<int, 2>> passFails;
 
-    // passFails.push_back(runAVLTreeTests());
-    // passFails.push_back(runSSTControllerTests());
-    // passFails.push_back(runBufferPoolTests());
+    passFails.push_back(runAVLTreeTests());
+    passFails.push_back(runSSTControllerTests());
+    passFails.push_back(runBufferPoolTests());
     passFails.push_back(runBTreeTests());
 
     // calculate the total number of passed/failed tests

@@ -136,17 +136,7 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
         }
 
         // check buffer pool for page first
-        vector<array<int, 2>> pageKVPairs =
-            bufferPool.getPage(theSSTIdx, pageNum);
-
-        if (pageKVPairs.empty()) {
-            // page not in buffer pool, so do an I/O and add the page to buffer
-            pageKVPairs = readSSTPage(theSSTIdx, pageNum);
-
-            if (pageKVPairs.empty()) {
-                throw runtime_error("Error reading from buffer pool");
-            }
-        }
+        vector<array<int, 2>> pageKVPairs = readSSTPage(theSSTIdx, pageNum);
 
         // add the KVPairs from the page to allKVPairs
         allKVPairs.insert(allKVPairs.end(), pageKVPairs.begin(),
@@ -159,34 +149,46 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
 }
 
 vector<array<int, 2>> SSTController::readSSTPage(int sstIdx, int page) {
-    // open the SST file
-    std::string path = existingSSTPath(sstIdx);
-    const char *sstPath = path.c_str();
-    int fd = open(sstPath, O_RDONLY);
-    if (fd < 0) {
-        throw runtime_error("Error opening file for direct I/O");
-    }
+    // check buffer pool for page first
+    vector<array<int, 2>> pageKVPairs = bufferPool.getPage(sstIdx, page);
 
-    char *buffer = nullptr;
-    if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
-        close(fd);
-        throw runtime_error("Memory allocation failed for page read");
-    }
+    if (pageKVPairs.empty()) {
+        // page not in buffer pool, so do an I/O and add the page to buffer
 
-    int offset = page * PAGE_SIZE;
-    ssize_t result = pread(fd, buffer, PAGE_SIZE, offset);
+        // open the SST file
+        std::string path = existingSSTPath(sstIdx);
+        const char *sstPath = path.c_str();
+        int fd = open(sstPath, O_RDONLY);
+        if (fd < 0) {
+            throw runtime_error("Error opening file for direct I/O");
+        }
 
-    if (result <= 0) {
+        char *buffer = nullptr;
+        if (posix_memalign((void **)&buffer, 512, PAGE_SIZE) != 0) {
+            close(fd);
+            throw runtime_error("Memory allocation failed for page read");
+        }
+
+        int offset = page * PAGE_SIZE;
+        ssize_t result = pread(fd, buffer, PAGE_SIZE, offset);
+
+        if (result <= 0) {
+            free(buffer);
+            close(fd);
+            throw runtime_error("Error reading SST page");
+        }
+
+        vector<array<int, 2>> kVPairs(result / KVPAIR_SIZE);
+        memcpy(kVPairs.data(), buffer, result);
+        pageKVPairs = kVPairs;
+
         free(buffer);
         close(fd);
-        throw runtime_error("Error reading SST page");
+
+        // add the page to buffer pool
+        bufferPool.putPage(sstIdx, page, pageKVPairs);
     }
 
-    vector<array<int, 2>> pageKVPairs(result / KVPAIR_SIZE);
-    memcpy(pageKVPairs.data(), buffer, result);
-
-    free(buffer);
-    close(fd);
     return pageKVPairs;
 }
 
