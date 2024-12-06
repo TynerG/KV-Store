@@ -32,7 +32,7 @@ bool LSMStore::put(int key, int value) {
 
         // clean the memtable by creating a new tree
         myMemtable = make_shared<AVLTree>(myMemtableSize);
-        return put(key, value);
+        return true;
     }
 
     return true;

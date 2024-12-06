@@ -186,7 +186,7 @@ bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) 
     size_t totalSize = totalPairs * KVPAIR_SIZE;
     size_t numPages = (totalSize + PAGE_SIZE - 1) / PAGE_SIZE;
     size_t numKVPairsInPage = PAGE_SIZE / KVPAIR_SIZE;
-    cerr << "performaing save for [" << totalSize << "] bits of data" << endl;
+    cerr << "performing save for [" << totalSize << "] bits of data" << endl;
 
     size_t pairsWritten = 0;
     for (size_t pageNum = 0; pageNum < numPages; ++pageNum) {
