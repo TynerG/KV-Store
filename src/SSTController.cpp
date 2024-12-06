@@ -118,7 +118,7 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
     while (inputFile) {
         // check buffer pool for page first
         vector<array<int, 2>> pageKVPairs =
-            bufferPool.getPage(theSSTIdx, pageNum);
+            bufferPool.getPage(bufferPool.makePageId(theSSTIdx, pageNum));
         if (pageKVPairs.empty()) {
             // read the file page by page
             inputFile.read(buffer, sizeof(buffer));
@@ -131,7 +131,7 @@ vector<array<int, 2>> SSTController::readSST(int theSSTIdx) {
 
             memcpy(ioKVPairs.data(), buffer, bytesRead);
             pageKVPairs = ioKVPairs;
-            bufferPool.putPage(theSSTIdx, pageNum, ioKVPairs);
+            bufferPool.putPage(bufferPool.makePageId(theSSTIdx, pageNum), ioKVPairs);
         }
 
         // add to all

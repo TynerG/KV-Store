@@ -31,6 +31,10 @@ string BufferPool::makePageId(int sstIdx, int pageNum) {
     return to_string(sstIdx) + "-" + to_string(pageNum);
 }
 
+string BufferPool::makeLeveledPageId(int sstLevel, int sstIdx, int pageNum) {
+    return to_string(sstLevel) + "-" + to_string(sstIdx) + "-" + to_string(pageNum);
+}
+
 int BufferPool::hashPageIdToIndex(string pageId) {
     return XXHash32::hash(pageId.c_str(), pageId.size(), SEED) % capacity;
 }
@@ -47,9 +51,8 @@ int BufferPool::findPage(int sstIdx, int pageNum) {
     return -1;  // page not found
 };
 
-vector<array<int, 2>> BufferPool::getPage(int sstIdx, int pageNum) {
+vector<array<int, 2>> BufferPool::getPage(string pageId) {
     // cout << sstIdx << "," << pageNum << endl;
-    string pageId = makePageId(sstIdx, pageNum);
     int idx = hashPageIdToIndex(pageId);
 
     BufferFrame* curr = bufferFrames[idx];
@@ -64,14 +67,12 @@ vector<array<int, 2>> BufferPool::getPage(int sstIdx, int pageNum) {
     return {};
 }
 
-void BufferPool::putPage(int sstIdx, int pageNum,
-                         vector<array<int, 2>> kvPairs) {
+void BufferPool::putPage(string pageId, vector<array<int, 2>> kvPairs) {
     if (numPages == capacity) {
         evictPage();
     }
 
     // insert page
-    string pageId = makePageId(sstIdx, pageNum);
     int idx = hashPageIdToIndex(pageId);
     BufferFrame* curr = bufferFrames[idx];
     BufferFrame* prev = nullptr;
@@ -143,4 +144,8 @@ void BufferPool::evictPage() {
             clockHand = (clockHand + 1) % capacity;
         }
     }
+}
+
+int BufferPool::getCapacity() {
+    return capacity;
 }

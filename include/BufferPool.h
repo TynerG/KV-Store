@@ -27,9 +27,6 @@ class BufferPool {
         bufferFrames;             // List of buffer frames ptrs for chaining
     int clockHand;                // Position of the clock hand in bufferFrames
 
-    // Generates a pageId for the given sstIdx and pageNum
-    string makePageId(int sstIdx, int pageNum);
-
     // Hashes pageId into an index of bufferFrame
     int hashPageIdToIndex(string pageId);
 
@@ -46,12 +43,20 @@ class BufferPool {
     int findPage(int sstIdx, int pageNum);
 
     // Returns KV Pairs in a page, or empty vector if page not in buffer pool
-    vector<array<int, 2>> getPage(int sstIdx, int pageNum);
+    vector<array<int, 2>> getPage(string pageId);
 
     // Inserts a page into buffer pool
-    void putPage(int sstIdx, int pageNum, vector<array<int, 2>> kvPairs);
+    void putPage(string pageId, vector<array<int, 2>> kvPairs);
 
     void updatePage(int sstIdx, int pageNum, vector<array<int, 2>> kvPairs);
+
+    // Generates a pageId for the given sstIdx and pageNum
+    string makePageId(int sstIdx, int pageNum);
+
+    string makeLeveledPageId(int sstLevel, int sstIdx, int pageNum);
+
+    // Returns the capacity of this buffer pool
+    int getCapacity();
 };
 
 #endif

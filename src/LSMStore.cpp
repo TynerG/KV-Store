@@ -96,7 +96,7 @@ vector<array<int, 2>> LSMStore::mergeScanResults(
             }
             i++;
         } else {
-            if (scanMem[i][1] != INT32_MIN) {
+            if (scanSST[j][1] != INT32_MIN) {
                 result.push_back(scanSST[j]);
             }
             j++;

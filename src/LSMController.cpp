@@ -102,6 +102,7 @@ bool LSMController::save(vector<array<int, 2>> theKVPairs, int theLevel) {
 
     if (myLevelMap[theLevel] == 2) {
         performCompaction();
+        invalidateBufferPool();
     }
 
     return true;
@@ -148,15 +149,16 @@ bool LSMController::performSave(vector<array<int, 2>> theKVPairs, int theLevel) 
 vector<array<int, 2>> LSMController::read(int theLevel, int thePageNum, int theSSTNum) {
     // check buffer pool for page first
     vector<array<int, 2>> pageKVPairs =
-            bufferPool.getPage(theLevel, thePageNum);
+            bufferPool.getPage(bufferPool.makeLeveledPageId(theLevel, theSSTNum, thePageNum));
 
     if (!pageKVPairs.empty()) {
         return pageKVPairs;
     }
 
-    // if we reach here, the page is not in buffer pool. So do an I/O to fetch it
+    // if we reach here, the page is not in buffer pool. So do an I/O to fetch itE
     ifstream inputFile(existingSSTPath(theLevel, theSSTNum), ios::binary);
     if (!inputFile) {
+
         throw runtime_error("Error when reading SSTs");
     }
 
@@ -181,7 +183,7 @@ vector<array<int, 2>> LSMController::read(int theLevel, int thePageNum, int theS
 
     memcpy(ioKVPairs.data(), buffer, bytesRead);
     kvPairs = ioKVPairs;
-    bufferPool.putPage(theLevel, thePageNum, ioKVPairs);
+    bufferPool.putPage(bufferPool.makeLeveledPageId(theLevel, theSSTNum, thePageNum), ioKVPairs);
 
     inputFile.close();
     return kvPairs;
@@ -189,6 +191,11 @@ vector<array<int, 2>> LSMController::read(int theLevel, int thePageNum, int theS
 
 pair<bool, int> LSMController::get(int theKey) {
     for (int level = 1; level <= myLevelMap.size(); level++) {
+
+        // skip the current level if it has no SST
+        if (myLevelMap[level] == 0) {
+            continue;
+        }
 
         int pageNum = 1;
         while (true) {
@@ -218,6 +225,11 @@ vector<array<int, 2>> LSMController::scan(int theLow, int theHigh) {
     vector<array<int, 2>> result;
 
     for (int level = 1; level <= myLevelMap.size(); level++) {
+        // skip the current level if it has no SST
+        if (myLevelMap[level] == 0) {
+            continue;
+        }
+
         int pageNum = 1;
         while (true) {
             // there should only be 1 sst in each level
@@ -230,7 +242,7 @@ vector<array<int, 2>> LSMController::scan(int theLow, int theHigh) {
             unsigned long size = kvPairs.size();
 
             // Skip the current SST if nothing is in range
-            if (kvPairs[0][1] > theHigh || kvPairs[size - 1][1] < theLow) {
+            if (kvPairs[0][0] > theHigh || kvPairs[size - 1][0] < theLow) {
                 pageNum++;
                 continue;
             }
@@ -274,11 +286,18 @@ vector<array<int, 2>> LSMController::scan(int theLow, int theHigh) {
 int LSMController::performCompaction() {
     int currentLevel = 1;
     while (currentLevel <= myLevelMap.size()) {
+
+        // skip the current level if less than 2
+        if (myLevelMap[currentLevel] < 2) {
+            currentLevel++;
+            continue;
+        }
+
         int pageNum = 1;
         while (true) {
             // read the 2 SSTs from the current level
-            const vector<array<int, 2>> &kvPairs_1 = read(1, pageNum, 1);
-            const vector<array<int, 2>> &kvPairs_2 = read(1, pageNum, 2);
+            const vector<array<int, 2>> &kvPairs_1 = read(currentLevel, pageNum, 1);
+            const vector<array<int, 2>> &kvPairs_2 = read(currentLevel, pageNum, 2);
 
             // break the loop when no more data to be read from both SSTs
             if (kvPairs_1.empty() && kvPairs_2.empty()) {
@@ -294,18 +313,18 @@ int LSMController::performCompaction() {
                 // use the pair from memtable if the key equals
                 if (kvPairs_1[i][0] == kvPairs_2[j][0]) {
                     // copy the value unless we are at the max level and encountered a tombstone
-                    if (!(currentLevel == myLevelMap.size() && kvPairs_2[i][1] == INT32_MIN)) {
-                        outputKVPairs.push_back(kvPairs_2[i]);
+                    if (!(currentLevel == myLevelMap.size() && kvPairs_2[j][1] == INT32_MIN)) {
+                        outputKVPairs.push_back(kvPairs_2[j]);
                     }
                     i++;
                     j++;
                 } else if (kvPairs_1[i][0] < kvPairs_2[j][0]) {
-                    if (!(currentLevel == myLevelMap.size() && kvPairs_2[i][1] == INT32_MIN)) {
+                    if (!(currentLevel == myLevelMap.size() && kvPairs_1[i][1] == INT32_MIN)) {
                         outputKVPairs.push_back(kvPairs_1[i]);
                     }
                     i++;
                 } else {
-                    if (!(currentLevel == myLevelMap.size() && kvPairs_2[i][1] == INT32_MIN)) {
+                    if (!(currentLevel == myLevelMap.size() && kvPairs_2[j][1] == INT32_MIN)) {
                         outputKVPairs.push_back(kvPairs_2[j]);
                     }
                     j++;
@@ -314,7 +333,7 @@ int LSMController::performCompaction() {
 
             // add the remaining elements
             while (i < kvPairs_1.size()) {
-                if (!(currentLevel == myLevelMap.size() && kvPairs_2[i][1] == INT32_MIN)) {
+                if (!(currentLevel == myLevelMap.size() && kvPairs_1[i][1] == INT32_MIN)) {
                     outputKVPairs.push_back(kvPairs_1[i]);
                 }
                 i++;
@@ -344,15 +363,8 @@ int LSMController::performCompaction() {
             throw runtime_error("Error when removing SSTs during compaction");
         }
 
-        // rename the new SST to have suffix "-1"
-        string oldSSTPath = existingSSTPath(currentLevel, 3);
-        string newSSTPath = existingSSTPath(currentLevel, 1);
-        if (rename(oldSSTPath.c_str(), newSSTPath.c_str()) == -1) {
-            throw runtime_error("Error when renaming SSTs during compaction");
-        }
-
         // update the map
-        myLevelMap[currentLevel] = 1;
+        myLevelMap[currentLevel] = 0;
 
         currentLevel++;
     }
@@ -365,10 +377,6 @@ string LSMController::buildPath(string theFilePath) {
 }
 
 string LSMController::newSSTPath(int theLevel) {
-    if (myLevelMap[theLevel] == SIZE_RATIO) {
-        // {DBName}/level-{theLevel}/sst-3
-        return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + "3");
-    }
     if (myLevelMap[theLevel] == SIZE_RATIO - 1) {
         // level-{theLevel}/sst-2
         return buildPath("level-" + to_string(theLevel) + "/" + SST_FILENAME_LSM + "2");
@@ -441,4 +449,10 @@ bool LSMController::close() {
         return false;
     }
     return true;
+}
+
+int LSMController::invalidateBufferPool() {
+    int capacity = bufferPool.getCapacity();
+    bufferPool = BufferPool(capacity);
+    return 0;
 }

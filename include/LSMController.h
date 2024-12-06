@@ -89,15 +89,23 @@ private:
     static int searchSSTSmallestLarger(const vector<array<int, 2>> &theKVPairs, int theTarget);
 
     /**
-     * recursively perform a compaction in the DB
+     * perform compaction in the DB
      */
     int performCompaction();
 
     /**
-     * Save the sst without compaction
+     * Save the sst without triggering compaction
+     * @param theKVPairs the KV-pairs to be saved.
+     * @param theLevel the level to be inserted.
+     * @return whether the save is success
      */
     bool performSave(vector<array<int, 2>> theKVPairs, int theLevel);
 
+    /**
+     * Invalidate all pages in the buffer pool
+     * @return whether the save is success
+     */
+    int invalidateBufferPool();
 
 public:
 

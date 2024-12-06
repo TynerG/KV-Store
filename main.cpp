@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-#include "KVStore.h"
+#include "LSMStore.h"
 
 using namespace std;
 
@@ -17,6 +17,9 @@ void show_help() {
          << endl;
     cout << "  scan <low> <high>          : Scans and retrieves all KV-pairs "
             "in the range [low, high]."
+         << endl;
+    cout << "  remove <key>                  : Remove the key-value pair associated "
+            "with a given key."
          << endl;
     cout << "  open <dbName> <memtableSize> <bufferCapacity> : Opens the KV "
             "store with the specified parameters."
@@ -33,7 +36,7 @@ void show_help() {
 }
 
 int main() {
-    shared_ptr<KVStore> kvStore = nullptr;
+    shared_ptr<LSMStore> lsmStore = nullptr;
     string command;
     bool isDbOpen = false;
 
@@ -66,8 +69,8 @@ int main() {
                             "<bufferCapacity>"
                          << endl;
                 } else {
-                    kvStore = make_shared<KVStore>(memtableSize, dbName,
-                                                   bufferCapacity);
+                    lsmStore = make_shared<LSMStore>(memtableSize, dbName,
+                                               bufferCapacity);
                     cout << "Opened KV Store with DB: " << dbName << endl;
                     isDbOpen = true;
                 }
@@ -80,7 +83,7 @@ int main() {
             if (cmd == "put") {
                 int key, value;
                 if (stringstream >> key >> value) {
-                    if (kvStore && kvStore->put(key, value)) {
+                    if (lsmStore && lsmStore->put(key, value)) {
                         cout << "Inserted (" << key << ", " << value
                              << ") into the KV store." << endl;
                     } else {
@@ -94,9 +97,9 @@ int main() {
             } else if (cmd == "get") {
                 int key;
                 if (stringstream >> key) {
-                    if (kvStore) {
+                    if (lsmStore) {
                         try {
-                            int value = kvStore->get(key);
+                            int value = lsmStore->get(key);
                             cout << "Value for key " << key << ": " << value
                                  << endl;
                         } catch (const std::runtime_error& e) {
@@ -111,8 +114,8 @@ int main() {
             } else if (cmd == "scan") {
                 int low, high;
                 if (stringstream >> low >> high) {
-                    if (kvStore) {
-                        vector<array<int, 2>> result = kvStore->scan(low, high);
+                    if (lsmStore) {
+                        vector<array<int, 2>> result = lsmStore->scan(low, high);
                         cout << "Scan results from " << low << " to " << high
                              << ": " << endl;
                         for (auto& pair : result) {
@@ -124,16 +127,33 @@ int main() {
                             "usage: scan <low> <high>"
                          << endl;
                 }
+            } else if (cmd == "remove") {
+                int key;
+                if (stringstream >> key) {
+                    if (lsmStore) {
+                        try {
+                            int value = lsmStore->remove(key);
+                            cout << "Removed the value pair with key: " << key
+                                 << endl;
+                        } catch (const std::runtime_error &e) {
+                            cout << "Key " << key << " doesn't exist." << endl;
+                        }
+                    }
+                } else {
+                    cout << "Invalid parameters for get command. Correct "
+                            "usage: remove <key>"
+                         << endl;
+                }
             } else if (cmd == "close") {
-                if (kvStore && kvStore->close()) {
+                if (lsmStore && lsmStore->close()) {
                     cout << "KV Store closed successfully." << endl;
                     isDbOpen = false;
                 } else {
                     cout << "Failed to close KV Store." << endl;
                 }
             } else if (cmd == "delete") {
-                if (kvStore) {
-                    kvStore->deleteDb();
+                if (lsmStore) {
+                    lsmStore->deleteDb();
                     isDbOpen = false;
                     cout << "Database " << dbName << " deleted." << endl;
                 } else {
