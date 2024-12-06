@@ -92,7 +92,7 @@ int main() {
     int intervals = 8;                           // interval size
     int queries = (1 << 10) / 8;                 // query 1KB of data
 
-    run_experiment(totalKVPairs, intervals, queries, "query_throughput.csv");
+    run_experiment(totalKVPairs, intervals, queries, "bin_search_get_throughput.csv");
 
     return 0;
 }

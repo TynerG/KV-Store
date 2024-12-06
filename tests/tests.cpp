@@ -281,14 +281,30 @@ array<int, 2> runBTreeTests() {
     }
 
     kvStore.createStaticBTree();
+    
     int res = kvStore.bTreeGet(10);
-    cout << "Test: B-tree get correct values" << endl;
+    cout << "Test: B-tree 1 SST get correct values" << endl;
     int expected = kvStore.bTreeGet(10);
     int actual = 10;
     checkTestResult<int>(expected, actual, passed, failed);
-    
+
     expected = kvStore.bTreeGet(511);
     actual = 511;
+    checkTestResult<int>(expected, actual, passed, failed);
+
+    expected = kvStore.bTreeGet(totalKVPairs - 1);
+    actual = totalKVPairs - 1;
+    checkTestResult<int>(expected, actual, passed, failed);
+
+    cout << "Test: B-tree 2 SST get correct values" << endl;
+    // put new data
+    for (int i = totalKVPairs; i < totalKVPairs * 2; i++) {
+        kvStore.put(i, i);
+    }
+    kvStore.createStaticBTree();
+
+    expected = kvStore.bTreeGet(totalKVPairs + 10);
+    actual = totalKVPairs + 10;
     checkTestResult<int>(expected, actual, passed, failed);
 
     kvStore.deleteDb();

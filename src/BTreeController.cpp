@@ -163,7 +163,6 @@ void BTreeController::createBTree(int sstIdx) {
         }
     }
 
-    // cout << "Root node size: " << BTreeLevels.back().size() << endl;
     char buffer[bTreeNodeSize];
 
     int pagesSoFar = 1;
@@ -214,10 +213,6 @@ int BTreeController::binarySearchNodeValues(vector<BTreeNodeValue> nodeValues,
         }
     }
 
-    // cout << "idx: " << l << ", key: " << key << endl;
-    // for (auto& value : nodeValues) {
-    //     cout << value.key << " ";
-    // }
     return nodeValues[l].childPage;
 }
 
@@ -234,7 +229,7 @@ BTreeNode BTreeController::readBTreePage(int fd, int page) {
     }
 
     BTreeNode root;
-    memcpy(&root.size, buffer + 4, sizeof(int));
+    memcpy(&root.size, buffer, sizeof(int));
     int offset = sizeof(int);  // start from after size is read
 
     // read the node values from the buffer
