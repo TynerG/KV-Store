@@ -1,4 +1,4 @@
-# CSC443-Fall-2024-Project
+# Introduction
 
 In this project, we present the implementation of a key-value (KV) store as part of the course project for CSC443. The database uses a combination of in-memory structures and disk storage to manage large amounts of data in gigabytes. This implementation uses a Memtable, Sorted String Tables (SSTs), a buffer pool, and a LSM Tree with a Bloom filter, and advanced query techniques to optimize for both storage and retrieval performance. Feel free to check out our [Report](report/report.pdf) for a detailed description of the project.
 
